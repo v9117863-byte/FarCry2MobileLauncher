@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Build-time fallback. The staging script removes this when real Winlator resources are copied. -->
+    <style name="AppThemeDark" parent="@android:style/Theme.Material.NoActionBar" />
+    <style name="AppThemeFullscreenDark" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>
