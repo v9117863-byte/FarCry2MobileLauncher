@@ -21,6 +21,18 @@ field_patch = field_marker + "\n    private final java.util.concurrent.atomic.At
 if field_marker not in s:
     raise SystemExit("Activity class declaration not found")
 s = s.replace(field_marker, field_patch, 1)
+# The launcher intentionally omits upstream SettingsFragment. Enable persistent diagnostics
+# automatically so a user can retrieve the Wine/Box64 log without hidden settings.
+prefs_marker = "        preferences = PreferenceManager.getDefaultSharedPreferences(this);"
+prefs_patch = prefs_marker + """
+        preferences.edit()
+            .putBoolean("enable_wine_debug", true)
+            .putInt("box64_logs", Math.max(1, preferences.getInt("box64_logs", 0)))
+            .putBoolean("save_logs_to_file", true)
+            .apply();"""
+if prefs_marker not in s:
+    raise SystemExit("Preferences initialization marker not found")
+s = s.replace(prefs_marker, prefs_patch, 1)
 if "import android.widget.Toast;" not in s:
     s = s.replace("import android.os.Bundle;", "import android.os.Bundle;\nimport android.widget.Toast;")
 if "import android.app.AlertDialog;" not in s:
