@@ -94,7 +94,7 @@ class MainActivity : Activity() {
                     val target = File(filesDir, "game").apply { if (exists()) deleteRecursively(); mkdirs() }
                     val sourceRoot = root
                     copyTree(sourceRoot, target)
-                    val copiedExe = File(target, relativePath(sourceRoot, exe))
+                    val copiedExe = findFile(target, "FarCry2.exe")
                     if (!copiedExe.exists()) throw IllegalStateException("Не удалось скопировать FarCry2.exe")
                     prefs.edit().putBoolean("game_imported", true).putString("game_path", copiedExe.absolutePath).apply()
                     runOnUiThread {
@@ -163,10 +163,12 @@ class MainActivity : Activity() {
         return null
     }
 
-    private fun relativePath(root: DocumentFile, file: DocumentFile): String {
-        val rootUri = root.uri.toString().trimEnd('/')
-        val fileUri = file.uri.toString()
-        return file.name ?: fileUri.removePrefix(rootUri).trimStart('/')
+    private fun findFile(dir: File, wanted: String): File? {
+        dir.listFiles()?.forEach { child ->
+            if (child.isFile && child.name.equals(wanted, ignoreCase = true)) return child
+            if (child.isDirectory) findFile(child, wanted)?.let { return it }
+        }
+        return null
     }
 
     private fun copyTree(source: DocumentFile, destination: File) {
