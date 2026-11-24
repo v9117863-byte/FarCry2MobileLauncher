@@ -33,6 +33,7 @@ class MainActivity : Activity() {
     @Volatile private var inputSocket: LocalSocket? = null
     private val requestFolder = 4102
     private val requestRuntimeFolder = 4103
+    private val requestWorldMap = 4104
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,6 +82,17 @@ class MainActivity : Activity() {
                 val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
                 startActivityForResult(intent, requestFolder)
+            }
+        }
+
+        @JavascriptInterface fun chooseWorldMap() {
+            runOnUiThread {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "image/*"
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                }
+                startActivityForResult(intent, requestWorldMap)
             }
         }
 
@@ -362,6 +374,21 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == requestWorldMap && resultCode == Activity.RESULT_OK) {
+            val uri = data?.data ?: return
+            try {
+                val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("Не удалось прочитать изображение карты")
+                if (bytes.size > 12 * 1024 * 1024) throw IllegalStateException("Файл карты слишком большой (максимум 12 МБ)")
+                val target = File(filesDir, "world-map.jpg")
+                target.writeBytes(bytes)
+                val encoded = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                evaluate("window.onWorldMapResult&&window.onWorldMapResult(true," + JSONObject.quote(encoded) + ",\"Карта загружена в приложение\")")
+            } catch (e: Exception) {
+                evaluate("window.onWorldMapResult&&window.onWorldMapResult(false,\"\"," + JSONObject.quote(e.message ?: "Ошибка загрузки карты") + ")")
+            }
+            return
+        }
         if ((requestCode == requestFolder || requestCode == requestRuntimeFolder) && resultCode == Activity.RESULT_OK) {
             val uri = data?.data ?: return
             val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
