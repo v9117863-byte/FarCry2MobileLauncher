@@ -117,6 +117,11 @@ startup_new = """        final java.util.concurrent.atomic.AtomicReference<Strin
 if startup_old not in s:
     raise SystemExit("Winlator startup block not found")
 s = s.replace(startup_old, startup_new, 1)
+window_gate_old = "if (!flags[0] && window.isRenderable() && !window.getClassName().isEmpty()) {"
+window_gate_new = "if (!flags[0] && window.isRenderable()) {"
+if window_gate_old not in s:
+    raise SystemExit("First renderable-window gate not found")
+s = s.replace(window_gate_old, window_gate_new, 1)
 first_window_old = """                    preloaderDialog.closeOnUiThread();
                     flags[0] = true;"""
 first_window_new = """                    preloaderDialog.closeOnUiThread();
