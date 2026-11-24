@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compatibility attributes referenced by the pinned Winlator Java sources. -->
+    <attr name="colorAccent" format="color" />
+    <attr name="colorError" format="color" />
+    <attr name="colorPrimarySurface" format="color" />
+</resources>
