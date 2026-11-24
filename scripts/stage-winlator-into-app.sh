@@ -118,7 +118,7 @@ field_marker = "public class XServerDisplayActivity extends AppCompatActivity im
 field_patch = field_marker + "\n    private final java.util.concurrent.atomic.AtomicBoolean startupFinished = new java.util.concurrent.atomic.AtomicBoolean(false);"
 if field_marker not in s:
     raise SystemExit("Activity class declaration not found")
- s = s.replace(field_marker, field_patch, 1)
+s = s.replace(field_marker, field_patch, 1)
 # Expose the active Winlator activity so the launcher Stop action can terminate the real Wine session.
 active_field = """
     private static volatile XServerDisplayActivity activeInstance;
