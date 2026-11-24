@@ -226,13 +226,24 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun launchGame(): String {
+            if (!prefs.getBoolean("game_imported", false)) {
+                return JSONObject().put("started", false).put("message", "Сначала полностью импортируй папку Far Cry 2 во внутреннее хранилище приложения.").toString()
+            }
             val gameExePath = prefs.getString("game_path", null)
-                ?: return JSONObject().put("started", false).put("message", "Сначала импортируй файлы Far Cry 2").toString()
+                ?: return JSONObject().put("started", false).put("message", "Не сохранён путь FarCry2.exe. Повтори импорт игры.").toString()
             val gameExe = try { File(gameExePath).canonicalFile } catch (e: Exception) {
                 return JSONObject().put("started", false).put("message", "Некорректный путь к FarCry2.exe").toString()
             }
-            if (!gameExe.isFile) {
-                return JSONObject().put("started", false).put("message", "FarCry2.exe не найден. Импортируй игру заново.").toString()
+            val gameRoot = File(filesDir, "game").canonicalFile
+            if (!gameExe.toPath().startsWith(gameRoot.toPath()) || !gameExe.isFile || gameExe.length() < 1024L) {
+                prefs.edit().putBoolean("game_imported", false).apply()
+                return JSONObject().put("started", false).put("message", "Файл FarCry2.exe отсутствует или импорт повреждён. Импортируй игру заново.").toString()
+            }
+            try {
+                assets.open(RootFSInstaller.FILENAME).use { }
+                assets.open("container_pattern.tzst").use { }
+            } catch (e: Exception) {
+                return JSONObject().put("started", false).put("message", "В APK не найдены RootFS или шаблон Wine-контейнера. Нужна полная сборка runtime.").toString()
             }
             synchronized(this@MainActivity) {
                 if (launchingGame) return JSONObject().put("started", false).put("preparing", true)
@@ -243,7 +254,7 @@ class MainActivity : Activity() {
                 try {
                     val rootFS = RootFS.find(this@MainActivity)
                     val rootDir = rootFS.rootDir
-                    if (!rootFS.isValid()) {
+                    if (!rootFS.isValid() || rootFS.version < RootFSInstaller.LATEST_VERSION.toInt()) {
                         if (rootDir.exists() && !rootDir.deleteRecursively()) {
                             throw IllegalStateException("Не удалось очистить повреждённый RootFS")
                         }
@@ -297,8 +308,15 @@ class MainActivity : Activity() {
             try {
                 val gameDir = gameExe.parentFile?.canonicalFile
                     ?: throw IllegalStateException("Не удалось определить папку игры")
-                // F: points directly to the imported game directory; Winlator creates the DOS-device symlink.
-                container.setDrives(Container.DEFAULT_DRIVES + "F:" + gameDir.absolutePath)
+                // Rebuild drive mappings without stale F: entries, then point F: at this exact imported game folder.
+                val driveMap = StringBuilder()
+                container.drivesIterator().forEach { drive ->
+                    if (!drive.letter.equals("F", ignoreCase = true)) {
+                        driveMap.append(drive.letter).append(':').append(drive.path)
+                    }
+                }
+                driveMap.append("F:").append(gameDir.absolutePath)
+                container.setDrives(driveMap.toString())
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
                 val intent = Intent(this@MainActivity, com.winlator.XServerDisplayActivity::class.java).apply {
