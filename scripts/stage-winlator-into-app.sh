@@ -18,6 +18,8 @@ p = Path(sys.argv[1])
 s = p.read_text()
 if "import android.widget.Toast;" not in s:
     s = s.replace("import android.os.Bundle;", "import android.os.Bundle;\nimport android.widget.Toast;")
+if "import android.app.AlertDialog;" not in s:
+    s = s.replace("import android.app.Activity;", "import android.app.Activity;\nimport android.app.AlertDialog;")
 if "import java.io.File;" not in s:
     s = s.replace("import java.io.", "import java.io.File;\nimport java.io.", 1)
 old = """            container = containerManager.getContainerById(getIntent().getIntExtra("container_id", 0));
@@ -41,8 +43,13 @@ s = s.replace(old, new, 1)
 # Keep the failure visible instead of silently restarting the launcher when Wine exits.
 old_cb = 'guestProgramLauncherComponent.setTerminationCallback((status) -> exit());'
 new_cb = """guestProgramLauncherComponent.setTerminationCallback((status) -> runOnUiThread(() -> {
-            Toast.makeText(this, "Far Cry 2 завершилась на этапе запуска (код " + status + "). Проверь игровой EXE и журнал запуска.", Toast.LENGTH_LONG).show();
-            finish();
+            new AlertDialog.Builder(this)
+                .setTitle("Far Cry 2 не запустилась")
+                .setMessage("Игровой процесс завершился с кодом " + status + ". Экран Winlator оставлен открытым, чтобы не возвращать тебя молча в лаунчер. Проверь EXE и настройки контейнера.")
+                .setPositiveButton("Вернуться в лаунчер", (dialog, which) -> finish())
+                .setNegativeButton("Остаться здесь", null)
+                .setCancelable(false)
+                .show();
         }));"""
 if old_cb not in s:
     raise SystemExit("Winlator termination callback insertion point not found")
