@@ -407,11 +407,12 @@ class MainActivity : Activity() {
                     com.winlator.XServerDisplayActivity.stopActiveSession()
                 } catch (_: Exception) { false }
                 val process = gameProcess
-                if (process?.isAlive == true) process.destroy()
+                val stoppedProcess = process?.isAlive == true
+                if (stoppedProcess) process?.destroy()
                 gameProcess = null
                 try { inputSocket?.close() } catch (_: Exception) { }
                 inputSocket = null
-                val stopped = stoppedWinlator || process?.isAlive == true
+                val stopped = stoppedWinlator || stoppedProcess
                 appendLaunchLog("STOP_REQUEST stopped=$stopped")
                 return JSONObject().put("stopped", stopped)
                     .put("message", if (stopped) "Игровая сессия остановлена" else "Активная игровая сессия не найдена").toString()
