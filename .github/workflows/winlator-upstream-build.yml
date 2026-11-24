@@ -35,6 +35,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install pinned native toolchains
         run: sdkmanager "ndk;24.0.8215888" "cmake;3.22.1"
