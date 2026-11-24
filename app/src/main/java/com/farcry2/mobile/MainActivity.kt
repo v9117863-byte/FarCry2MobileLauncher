@@ -217,9 +217,12 @@ class MainActivity : Activity() {
             val path = prefs.getString("runtime_path", null)
             val manifest = path?.let { File(it, "runtime-manifest.json") }
             val valid = imported && manifest?.isFile == true
-            val bundled = assets.list("runtime")?.contains("runtime-manifest.json") == true
-            return JSONObject().put("bundled", bundled).put("imported", valid)
-                .put("components", assets.list("runtime")?.toList() ?: emptyList<String>()).toString()
+            val runtimeBundled = assets.list("runtime")?.contains("runtime-manifest.json") == true
+            val rootAssets = assets.list("")?.toSet() ?: emptySet()
+            val winlatorBundled = rootAssets.contains("rootfs.tzst") && rootAssets.contains("container_pattern.tzst")
+            val bundled = runtimeBundled || winlatorBundled
+            return JSONObject().put("bundled", bundled).put("winlatorBundled", winlatorBundled).put("imported", valid)
+                .put("components", if (winlatorBundled) rootAssets.toList() else assets.list("runtime")?.toList() ?: emptyList<String>()).toString()
         }
 
         @JavascriptInterface fun launchGame(): String {
