@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.content.Intent
 import android.net.Uri
+import android.net.LocalSocket
+import android.net.LocalSocketAddress
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -28,6 +30,7 @@ class MainActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("fc2", MODE_PRIVATE) }
     private var selectedTree: Uri? = null
     @Volatile private var gameProcess: Process? = null
+    @Volatile private var inputSocket: LocalSocket? = null
     private val requestFolder = 4102
     private val requestRuntimeFolder = 4103
 
@@ -262,6 +265,8 @@ class MainActivity : Activity() {
                 val process = gameProcess
                 if (process?.isAlive == true) process.destroy()
                 gameProcess = null
+                try { inputSocket?.close() } catch (_: Exception) { }
+                inputSocket = null
                 return JSONObject().put("stopped", true).put("message", "Внутренний runtime остановлен").toString()
             }
         }
@@ -273,7 +278,24 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun onGameInput(json: String) {
-            // Input bridge endpoint reserved for the future native runtime input daemon.
+            worker.execute {
+                try {
+                    var socket = inputSocket
+                    if (socket == null || !socket.isConnected) {
+                        socket?.close()
+                        socket = LocalSocket()
+                        socket.connect(LocalSocketAddress("fc2_runtime_input", LocalSocketAddress.Namespace.ABSTRACT))
+                        inputSocket = socket
+                    }
+                    socket.getOutputStream().apply {
+                        write((json + "\\n").toByteArray(Charsets.UTF_8))
+                        flush()
+                    }
+                } catch (_: Exception) {
+                    try { inputSocket?.close() } catch (_: Exception) { }
+                    inputSocket = null
+                }
+            }
         }
 
         @JavascriptInterface fun vibrate() {
@@ -357,6 +379,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         gameProcess?.let { if (it.isAlive) it.destroy() }
+        try { inputSocket?.close() } catch (_: Exception) { }
         worker.shutdown()
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
