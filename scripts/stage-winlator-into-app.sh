@@ -10,6 +10,42 @@ fi
 mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
+# Persist subprocess output directly; upstream LogView only writes when its UI stream is usable.
+python3 - "$APP/java/com/winlator/core/ProcessHelper.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+needle = "    private static void createDebugThread(final InputStream inputStream) {"
+method = """    public static synchronized void appendDiagnosticLine(String line) {
+        java.io.File logFile = new java.io.File(
+            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS),
+            "Winlator/logs.txt"
+        );
+        try {
+            java.io.File parent = logFile.getParentFile();
+            if (parent != null && !parent.isDirectory()) parent.mkdirs();
+            try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(logFile, true))) {
+                writer.write("[" + new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(new java.util.Date()) + "] " + line);
+                writer.newLine();
+            }
+        }
+        catch (Exception error) {
+            android.util.Log.e("FarCry2Diagnostics", "Cannot append diagnostics to " + logFile, error);
+        }
+    }
+
+"""
+if needle not in s:
+    raise SystemExit("ProcessHelper debug thread marker not found")
+s = s.replace(needle, method + needle, 1)
+needle2 = "                while ((line = reader.readLine()) != null) {"
+replace2 = needle2 + "\n                    appendDiagnosticLine(line);"
+if needle2 not in s:
+    raise SystemExit("ProcessHelper output read loop not found")
+s = s.replace(needle2, replace2, 1)
+p.write_text(s)
+PY
 # Fail gracefully instead of crashing if the saved container or imported EXE vanished.
 python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
 from pathlib import Path
