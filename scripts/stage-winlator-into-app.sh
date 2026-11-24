@@ -124,8 +124,19 @@ startup_new = """        final java.util.concurrent.atomic.AtomicReference<Strin
                         .show();
                 });
             }
-            finally { startupFinished.set(true); }
         });"""
+if startup_old not in s:
+    raise SystemExit("Winlator startup block not found")
+s = s.replace(startup_old, startup_new, 1)
+first_window_old = """                    preloaderDialog.closeOnUiThread();
+                    flags[0] = true;"""
+first_window_new = """                    preloaderDialog.closeOnUiThread();
+                    startupFinished.set(true);
+                    android.util.Log.i("FarCry2Startup", "First renderable X11 window appeared; startup complete");
+                    flags[0] = true;"""
+if first_window_old not in s:
+    raise SystemExit("First X11 window hook not found")
+s = s.replace(first_window_old, first_window_new, 1)
 p.write_text(s)
 PY
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
