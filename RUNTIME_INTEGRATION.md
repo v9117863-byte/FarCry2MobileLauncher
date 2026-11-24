@@ -65,3 +65,18 @@ Do not treat a manifest passing validation as proof that the runtime works.
 ## Device and compatibility notes
 
 Far Cry 2 is a 32-bit Windows game with Direct3D 9/10-era rendering. Runtime compatibility and performance are not guaranteed. Test the same game build and settings on each GPU/backend combination. Do not force Turnip on Mali devices.
+
+## Verified Winlator launch path (pinned upstream revision)
+
+The pinned upstream source was built successfully as a standalone debug APK in GitHub Actions run #2. This proves the upstream project can be built in CI; it does **not** prove that it has been merged into this launcher.
+
+Source inspection at `f8a211ce7fd776de9a2642b45d166016876eaa86` confirms the actual launch path:
+
+- `XServerDisplayActivity` reads a `container_id` extra and obtains the selected Wine container from `ContainerManager`.
+- For direct executable launch it also reads `exec_path`; its startup path prepares the container/Wine prefix, then creates `XEnvironment` with X server, shared-memory, audio and selected graphics-renderer components.
+- `GuestProgramLauncherComponent` launches the guest command through Box64 inside the installed RootFS. The activity's command is Wine Explorer with the configured desktop and game executable.
+- `XServerView` is an OpenGL ES 3 view backed by Winlator's `GLRenderer`; it is not a standalone renderer that can be dropped into the existing WebView activity.
+
+Therefore the next integration unit is not a single Activity file. It is the coordinated set of RootFS installation/assets, container creation/configuration, XServerDisplayActivity and its layout/resources, XEnvironment components, native/JNI libraries, and the Gradle/manifest merge. The launcher should remain the entry Activity, and the game button should start the integrated display Activity with a prepared container ID and the imported FarCry2 executable path.
+
+Before enabling that route, the integration build must verify that the application ID remains `com.farcry2.mobile`, that upstream FileProvider authorities are renamed to avoid collisions, and that all required upstream permissions, services, resources, JNI ABIs and license notices are retained.
