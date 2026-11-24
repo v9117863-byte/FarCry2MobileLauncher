@@ -38,6 +38,15 @@ new = """            container = containerManager.getContainerById(getIntent().g
 if old not in s:
     raise SystemExit("Winlator launch guard insertion point not found")
 s = s.replace(old, new, 1)
+# Keep the failure visible instead of silently restarting the launcher when Wine exits.
+old_cb = 'guestProgramLauncherComponent.setTerminationCallback((status) -> exit());'
+new_cb = """guestProgramLauncherComponent.setTerminationCallback((status) -> runOnUiThread(() -> {
+            Toast.makeText(this, "Far Cry 2 завершилась на этапе запуска (код " + status + "). Проверь игровой EXE и журнал запуска.", Toast.LENGTH_LONG).show();
+            finish();
+        }));"""
+if old_cb not in s:
+    raise SystemExit("Winlator termination callback insertion point not found")
+s = s.replace(old_cb, new_cb, 1)
 p.write_text(s)
 PY
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
