@@ -56,27 +56,12 @@ if old_cb not in s:
 s = s.replace(old_cb, new_cb, 1)
 # Catch failures during Winlator's background initialization; otherwise the display stays blank forever.
 startup_old = """        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                if (!isGenerateWineprefix()) {
-                    setupWineSystemFiles();
-                    extractGraphicsDriverFiles();
-                    changeWineAudioDriver();
-                }
-                setupXEnvironment();
+            if (!isGenerateWineprefix()) {
+                setupWineSystemFiles();
+                extractGraphicsDriverFiles();
+                changeWineAudioDriver();
             }
-            catch (Throwable error) {
-                android.util.Log.e("FarCry2Startup", "Winlator startup failed before guest process launch", error);
-                runOnUiThread(() -> {
-                    String detail = error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage());
-                    new AlertDialog.Builder(this)
-                        .setTitle("Ошибка запуска Winlator")
-                        .setMessage("Сбой произошёл до запуска FarCry2.exe.\\n\\n"+detail+"\\n\\nПодробности сохранены в системном журнале Android.")
-                        .setPositiveButton("Вернуться в лаунчер", (dialog, which) -> finish())
-                        .setNegativeButton("Остаться на экране", null)
-                        .setCancelable(false)
-                        .show();
-                });
-            }
+            setupXEnvironment();
         });"""
 startup_new = """        final java.util.concurrent.atomic.AtomicReference<String> startupStage = new java.util.concurrent.atomic.AtomicReference<>("Подготовка Winlator");
         final java.util.concurrent.atomic.AtomicBoolean startupFinished = new java.util.concurrent.atomic.AtomicBoolean(false);
