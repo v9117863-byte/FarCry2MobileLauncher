@@ -318,7 +318,9 @@ class MainActivity : Activity() {
                 val driveMap = StringBuilder()
                 container.drivesIterator().forEach { drive ->
                     if (!drive.letter.equals("F", ignoreCase = true)) {
-                        driveMap.append(drive.letter).append(':').append(drive.path)
+                        // The upstream drive parser uses the character before the next drive letter as a separator.
+                        // Restore the trailing slash removed by drivesIterator() so existing mappings stay intact.
+                        driveMap.append(drive.letter).append(':').append(drive.path).append('/')
                     }
                 }
                 driveMap.append("F:").append(gameDir.absolutePath)
