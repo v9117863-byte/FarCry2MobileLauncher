@@ -8,7 +8,8 @@ if [[ -z "$UPSTREAM_NAMESPACE" ]]; then
   exit 3
 fi
 mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
-cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/"
+mkdir -p "$APP/java/com"
+cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
 # Fail gracefully instead of crashing if the saved container or imported EXE vanished.
 python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
 from pathlib import Path
