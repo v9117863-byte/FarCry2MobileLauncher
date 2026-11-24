@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.farcry2.mobile"
+    namespace = "com.winlator"
     compileSdk = 35
     ndkVersion = "24.0.8215888"
 
