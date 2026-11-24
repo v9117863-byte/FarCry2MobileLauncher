@@ -36,3 +36,14 @@ Android SDK/Gradle tooling is not available in the current build workspace, so a
 ## Game files
 
 Use only a legally obtained copy of Far Cry 2. Game files are not included in this repository.
+
+
+## Current Android app scaffold
+
+The repository now includes the HTML launcher in `app/src/main/assets/index.html`, a native Android WebView host, SAF folder selection and game-file import, plus a GitHub Actions debug-APK workflow.
+
+- [Minimum Android requirements](MINIMUM_REQUIREMENTS.md)
+- [Device optimization policy](DEVICE_OPTIMIZATION.md)
+- [Windows runtime integration status](RUNTIME_INTEGRATION.md)
+
+The APK workflow builds the launcher host only. The PC game still cannot launch until a compatible Windows runtime, DirectX 9 graphics translation backend, audio/input integration, and device testing are completed.
