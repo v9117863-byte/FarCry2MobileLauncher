@@ -1,0 +1,42 @@
+name: Winlator integrated APK experiment
+
+on:
+  push:
+    branches: [ integration/winlator-engine ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Far Cry 2 launcher
+        uses: actions/checkout@v4
+      - name: Checkout pinned Winlator
+        uses: actions/checkout@v4
+        with:
+          repository: brunodev85/winlator-app
+          ref: f8a211ce7fd776de9a2642b45d166016876eaa86
+          path: .ci/winlator-upstream
+          persist-credentials: false
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v3
+      - name: Install pinned NDK and CMake
+        run: sdkmanager "ndk;24.0.8215888" "cmake;3.22.1"
+      - name: Stage Winlator Java, native, JNI, resources and offline assets
+        run: bash scripts/stage-winlator-into-app.sh .ci/winlator-upstream
+      - name: Build merged Android APK
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+      - name: Upload experimental APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FarCry2Mobile-Winlator-merged-experiment
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
