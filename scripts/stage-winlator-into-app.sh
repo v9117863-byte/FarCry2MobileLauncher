@@ -9,6 +9,34 @@ if [[ -z "$UPSTREAM_NAMESPACE" ]]; then
 fi
 mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/"
+# Fail gracefully instead of crashing if the saved container or imported EXE vanished.
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+if "import android.widget.Toast;" not in s:
+    s = s.replace("import android.widget.Spinner;", "import android.widget.Spinner;\nimport android.widget.Toast;")
+old = """            container = containerManager.getContainerById(getIntent().getIntExtra("container_id", 0));
+            containerManager.activateContainer(container);"""
+new = """            container = containerManager.getContainerById(getIntent().getIntExtra("container_id", 0));
+            if (container == null) {
+                Toast.makeText(this, "Wine-контейнер не найден. Вернись в лаунчер и повтори PLAY.", Toast.LENGTH_LONG).show();
+                finish();
+                return;
+            }
+            String requestedExecPath = getIntent().getStringExtra("exec_path");
+            if (requestedExecPath != null && !new File(requestedExecPath).isFile()) {
+                Toast.makeText(this, "FarCry2.exe больше не найден в импортированной папке игры.", Toast.LENGTH_LONG).show();
+                finish();
+                return;
+            }
+            containerManager.activateContainer(container);"""
+if old not in s:
+    raise SystemExit("Winlator launch guard insertion point not found")
+s = s.replace(old, new, 1)
+p.write_text(s)
+PY
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
 if [[ -d "$UPSTREAM/app/src/main/jniLibs" ]]; then
   mkdir -p "$APP/jniLibs"
