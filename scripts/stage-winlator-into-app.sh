@@ -16,6 +16,11 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 s = p.read_text()
+field_marker = "public class XServerDisplayActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {"
+field_patch = field_marker + "\\n    private final java.util.concurrent.atomic.AtomicBoolean startupFinished = new java.util.concurrent.atomic.AtomicBoolean(false);"
+if field_marker not in s:
+    raise SystemExit("Activity class declaration not found")
+s = s.replace(field_marker, field_patch, 1)
 if "import android.widget.Toast;" not in s:
     s = s.replace("import android.os.Bundle;", "import android.os.Bundle;\nimport android.widget.Toast;")
 if "import android.app.AlertDialog;" not in s:
@@ -64,7 +69,6 @@ startup_old = """        Executors.newSingleThreadExecutor().execute(() -> {
             setupXEnvironment();
         });"""
 startup_new = """        final java.util.concurrent.atomic.AtomicReference<String> startupStage = new java.util.concurrent.atomic.AtomicReference<>("Подготовка Winlator");
-        final java.util.concurrent.atomic.AtomicBoolean startupFinished = new java.util.concurrent.atomic.AtomicBoolean(false);
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             if (startupFinished.get() || isFinishing()) return;
             String stage = startupStage.get();
