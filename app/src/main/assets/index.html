@@ -174,5 +174,11 @@ function refreshInstallStatus(){try{if(!window.AndroidDevice)return;const g=JSON
 function launch(){if(window.AndroidDevice?.launchGame){try{const r=JSON.parse(AndroidDevice.launchGame());toast(r.message||'Подготовка запуска');if(r.started){openControlTest();$('controlReadout').textContent='WINLATOR TOUCH CONTROLS ACTIVE';}}catch(e){toast('Не удалось начать запуск Winlator внутри приложения.')}}else toast('Для запуска требуется Android APK со встроенным Winlator.');}
 window.onGameLaunchResult=function(ok,message){toast(message);if(ok){openControlTest();$('controlReadout').textContent='WINLATOR TOUCH CONTROLS ACTIVE';}refreshInstallStatus();};
 function chooseWorldMap(){if(window.AndroidDevice?.chooseWorldMap){AndroidDevice.chooseWorldMap();return;}toast("Импорт карты доступен в Android-приложении.");}window.onWorldMapResult=function(ok,data,message,mime,isUrl){const img=document.getElementById("worldMapImage"),msg=document.getElementById("worldMapMessage");msg.textContent=message||(ok?"Карта загружена":"Не удалось загрузить карту");if(ok&&data){img.onerror=function(){msg.textContent="Не удалось отобразить файл карты";};img.src=isUrl?data:("data:"+(mime||"image/jpeg")+";base64,"+data);img.classList.remove("hidden");}};
+// Keep the live controller layout and runtime configuration in sync with settings.
+['fireButtonCount','fireAimMode','aimAssistEnabled'].forEach(id=>{
+ const el=$(id); if(el) el.addEventListener('change',()=>{applyControlOptions();save()});
+});
+const aimStrength=$('aimAssistStrength');
+if(aimStrength) aimStrength.addEventListener('input',()=>{applyControlOptions();save()});
 restore();showDock(false);loadDevice();markFocus();refreshInstallStatus();applyControlOptions();
 </script></body></html>
