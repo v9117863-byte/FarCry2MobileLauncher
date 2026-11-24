@@ -11,6 +11,9 @@ permissions:
 jobs:
   stage-and-build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Checkout Far Cry 2 launcher
         uses: actions/checkout@v4
@@ -26,10 +29,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Android SDK and NDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
       - name: Install pinned NDK and CMake
-        run: sdkmanager "ndk;24.0.8215888" "cmake;3.22.1"
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;24.0.8215888" "cmake;3.22.1" "platforms;android-35" "build-tools;35.0.0"
       - name: Stage Winlator Java, native, JNI, resources and offline assets
         run: bash scripts/stage-winlator-into-app.sh .ci/winlator-upstream
       - name: Build merged Android APK
