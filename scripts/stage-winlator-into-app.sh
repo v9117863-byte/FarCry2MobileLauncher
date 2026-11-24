@@ -44,6 +44,21 @@ replace2 = needle2 + "\n                    appendDiagnosticLine(line);"
 if needle2 not in s:
     raise SystemExit("ProcessHelper output read loop not found")
 s = s.replace(needle2, replace2, 1)
+# Always drain stdout/stderr, even when no DebugDialog callback is registered.
+# Otherwise ProcessHelper redirects both streams to /dev/null and no diagnostic reader runs.
+redirect_old = '            if (debugCallbacks.isEmpty()) processBuilder.redirectOutput(new File("/dev/null")).redirectErrorStream(true);'
+if redirect_old not in s:
+    raise SystemExit("ProcessHelper output redirect marker not found")
+s = s.replace(redirect_old, '', 1)
+thread_old = '''            if (!debugCallbacks.isEmpty()) {
+                createDebugThread(process.getInputStream());
+                createDebugThread(process.getErrorStream());
+            }'''
+thread_new = '''            createDebugThread(process.getInputStream());
+            createDebugThread(process.getErrorStream());'''
+if thread_old not in s:
+    raise SystemExit("ProcessHelper debug thread gate not found")
+s = s.replace(thread_old, thread_new, 1)
 p.write_text(s)
 PY
 # Fail gracefully instead of crashing if the saved container or imported EXE vanished.
