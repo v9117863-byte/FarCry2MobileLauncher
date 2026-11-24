@@ -6,19 +6,22 @@ plugins {
 android {
     namespace = "com.farcry2.mobile"
     compileSdk = 35
+
     defaultConfig {
         applicationId = "com.farcry2.mobile"
         minSdk = 26
         targetSdk = 35
+        versionCode = 10
+        versionName = "0.10.0-runtime-host"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
-    }
-        versionCode = 9
-        versionName = "0.9.0-runtime-host"
     }
 }
 
@@ -42,7 +45,6 @@ val verifyBundledRuntime by tasks.registering {
 if (providers.gradleProperty("requireBundledRuntime").orNull == "true") {
     tasks.named("preBuild").configure { dependsOn(verifyBundledRuntime) }
 }
-
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
