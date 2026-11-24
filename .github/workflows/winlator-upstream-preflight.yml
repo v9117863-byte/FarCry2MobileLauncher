@@ -1,0 +1,34 @@
+name: Winlator upstream preflight
+
+on:
+  push:
+    branches: [ integration/winlator-engine ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-pinned-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Far Cry 2 launcher
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned Winlator source
+        uses: actions/checkout@v4
+        with:
+          repository: brunodev85/winlator-app
+          ref: f8a211ce7fd776de9a2642b45d166016876eaa86
+          path: .ci/winlator-upstream
+          persist-credentials: false
+
+      - name: Verify complete runtime inputs
+        run: bash scripts/verify-winlator-upstream.sh .ci/winlator-upstream WINLATOR_UPSTREAM_PREFLIGHT.txt
+
+      - name: Upload preflight report
+        uses: actions/upload-artifact@v4
+        with:
+          name: winlator-upstream-preflight
+          path: WINLATOR_UPSTREAM_PREFLIGHT.txt
+          if-no-files-found: error
