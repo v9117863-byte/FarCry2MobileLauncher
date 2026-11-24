@@ -95,6 +95,7 @@ class MainActivity : Activity() {
                     val sourceRoot = root
                     copyTree(sourceRoot, target)
                     val copiedExe = findFile(target, "FarCry2.exe")
+                        ?: throw IllegalStateException("FarCry2.exe не скопирован")
                     if (!copiedExe.exists()) throw IllegalStateException("Не удалось скопировать FarCry2.exe")
                     prefs.edit().putBoolean("game_imported", true).putString("game_path", copiedExe.absolutePath).apply()
                     runOnUiThread {
