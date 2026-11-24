@@ -35,3 +35,8 @@ val verifyBundledRuntime by tasks.registering {
 if (providers.gradleProperty("requireBundledRuntime").orNull == "true") {
     tasks.named("preBuild").configure { dependsOn(verifyBundledRuntime) }
 }
+
+
+dependencies {
+    implementation("androidx.documentfile:documentfile:1.0.1")
+}
