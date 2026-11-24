@@ -56,14 +56,6 @@ if old_cb not in s:
 s = s.replace(old_cb, new_cb, 1)
 # Catch failures during Winlator's background initialization; otherwise the display stays blank forever.
 startup_old = """        Executors.newSingleThreadExecutor().execute(() -> {
-            if (!isGenerateWineprefix()) {
-                setupWineSystemFiles();
-                extractGraphicsDriverFiles();
-                changeWineAudioDriver();
-            }
-            setupXEnvironment();
-        });"""
-startup_new = """        Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 if (!isGenerateWineprefix()) {
                     setupWineSystemFiles();
@@ -86,9 +78,54 @@ startup_new = """        Executors.newSingleThreadExecutor().execute(() -> {
                 });
             }
         });"""
-if startup_old not in s:
-    raise SystemExit("Winlator startup worker insertion point not found")
-s = s.replace(startup_old, startup_new, 1)
+startup_new = """        final java.util.concurrent.atomic.AtomicReference<String> startupStage = new java.util.concurrent.atomic.AtomicReference<>("Подготовка Winlator");
+        final java.util.concurrent.atomic.AtomicBoolean startupFinished = new java.util.concurrent.atomic.AtomicBoolean(false);
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (startupFinished.get() || isFinishing()) return;
+            String stage = startupStage.get();
+            android.util.Log.e("FarCry2Startup", "Startup timeout; current stage: " + stage);
+            new AlertDialog.Builder(this)
+                .setTitle("Запуск Far Cry 2 задерживается")
+                .setMessage("Winlator всё ещё выполняет этап:\\n\\n" + stage + "\\n\\nМожно подождать или вернуться в лаунчер. Подробности этапов записаны в системный журнал Android.")
+                .setPositiveButton("Продолжить ожидание", null)
+                .setNegativeButton("Вернуться в лаунчер", (dialog, which) -> finish())
+                .setCancelable(false)
+                .show();
+        }, 120000);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                if (!isGenerateWineprefix()) {
+                    startupStage.set("Подготовка файлов Wine");
+                    android.util.Log.i("FarCry2Startup", startupStage.get());
+                    setupWineSystemFiles();
+                    startupStage.set("Распаковка графического драйвера");
+                    android.util.Log.i("FarCry2Startup", startupStage.get());
+                    extractGraphicsDriverFiles();
+                    startupStage.set("Настройка звука Wine");
+                    android.util.Log.i("FarCry2Startup", startupStage.get());
+                    changeWineAudioDriver();
+                }
+                startupStage.set("Запуск X-сервера и Wine");
+                android.util.Log.i("FarCry2Startup", startupStage.get());
+                setupXEnvironment();
+                startupStage.set("Ожидание первого окна игры");
+                android.util.Log.i("FarCry2Startup", startupStage.get());
+            }
+            catch (Throwable error) {
+                android.util.Log.e("FarCry2Startup", "Winlator startup failed at stage: " + startupStage.get(), error);
+                runOnUiThread(() -> {
+                    String detail = "Этап: " + startupStage.get() + "\\n" + error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage());
+                    new AlertDialog.Builder(this)
+                        .setTitle("Ошибка запуска Winlator")
+                        .setMessage("Сбой произошёл до запуска FarCry2.exe.\\n\\n"+detail+"\\n\\nПодробности сохранены в системном журнале Android.")
+                        .setPositiveButton("Вернуться в лаунчер", (dialog, which) -> finish())
+                        .setNegativeButton("Остаться на экране", null)
+                        .setCancelable(false)
+                        .show();
+                });
+            }
+            finally { startupFinished.set(true); }
+        });"""
 p.write_text(s)
 PY
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
