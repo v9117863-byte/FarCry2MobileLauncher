@@ -85,16 +85,19 @@ s = s.replace(exec_old, exec_new, 1)
 started_old = """            pid = pidField.getInt(process);
             pidField.setAccessible(false);
 
-            createDebugThread(process.getInputStream());"""
+            if (!debugCallbacks.isEmpty()) {
+                createDebugThread(process.getInputStream());
+                createDebugThread(process.getErrorStream());
+            }"""
 started_new = """            pid = pidField.getInt(process);
             pidField.setAccessible(false);
             appendDiagnosticLine("Process started; pid=" + pid);
-
-            createDebugThread(process.getInputStream());"""
+            createDebugThread(process.getInputStream());
+            createDebugThread(process.getErrorStream());"""
 if started_old not in s: raise SystemExit("ProcessHelper process-start marker not found")
 s = s.replace(started_old, started_new, 1)
 import re
-pattern = r'        }\\s*catch \\(Exception e\\) \\{\\}\\s*return pid;\\s*}\\s*private static void createDebugThread'
+pattern = r'        }\s*catch \(Exception e\) \{\}\s*return pid;\s*}\s*private static void createDebugThread'
 match = re.search(pattern, s)
 if not match:
     raise SystemExit("ProcessHelper exec catch block not found (regex)")
