@@ -254,7 +254,7 @@ class MainActivity : Activity() {
                 try {
                     val rootFS = RootFS.find(this@MainActivity)
                     val rootDir = rootFS.rootDir
-                    if (!rootFS.isValid() || rootFS.version < RootFSInstaller.LATEST_VERSION.toInt()) {
+                    if (!rootFS.isValid()) {
                         if (rootDir.exists() && !rootDir.deleteRecursively()) {
                             throw IllegalStateException("Не удалось очистить повреждённый RootFS")
                         }
