@@ -93,12 +93,11 @@ started_new = """            pid = pidField.getInt(process);
             createDebugThread(process.getInputStream());"""
 if started_old not in s: raise SystemExit("ProcessHelper process-start marker not found")
 s = s.replace(started_old, started_new, 1)
-catch_old = """        }
-        catch (Exception e) {}
-        return pid;
-    }
-
-    private static void createDebugThread"""
+import re
+pattern = r'        }\\s*catch \\(Exception e\\) \\{\\}\\s*return pid;\\s*}\\s*private static void createDebugThread'
+match = re.search(pattern, s)
+if not match:
+    raise SystemExit("ProcessHelper exec catch block not found (regex)")
 catch_new = """        }
         catch (Exception e) {
             appendDiagnosticLine("ProcessHelper.exec ERROR: " + e.getClass().getName() + ": " + String.valueOf(e.getMessage()));
@@ -108,8 +107,7 @@ catch_new = """        }
     }
 
     private static void createDebugThread"""
-if catch_old not in s: raise SystemExit("ProcessHelper silent catch marker not found")
-s = s.replace(catch_old, catch_new, 1)
+s = s[:match.start()] + catch_new + s[match.end():]
 p.write_text(s)
 PY
 # Fail gracefully instead of crashing if the saved container or imported EXE vanished.
