@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.farcry2.mobile"
     compileSdk = 35
+    ndkVersion = "24.0.8215888"
 
     defaultConfig {
         applicationId = "com.farcry2.mobile"
@@ -13,6 +14,14 @@ android {
         targetSdk = 35
         versionCode = 10
         versionName = "0.10.0-runtime-host"
+        ndk { abiFilters += listOf("arm64-v8a") }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     compileOptions {
@@ -20,9 +29,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+    kotlinOptions { jvmTarget = "17" }
 }
 
 val verifyBundledRuntime by tasks.registering {
@@ -47,17 +54,14 @@ if (providers.gradleProperty("requireBundledRuntime").orNull == "true") {
 }
 
 dependencies {
-    // Android/UI and process lifecycle dependencies used by the pinned Winlator source.
     implementation("androidx.appcompat:appcompat:1.4.0")
     implementation("androidx.preference:preference:1.2.1")
     implementation("com.google.android.material:material:1.4.0")
     implementation("androidx.lifecycle:lifecycle-process:2.5.1")
-
-    // Archive formats required by RootFS/container installation.
     implementation("com.github.luben:zstd-jni:1.5.2-3@aar")
     implementation("org.tukaani:xz:1.12")
     implementation("org.apache.commons:commons-compress:1.28.0")
-
-    // Existing Far Cry 2 file-picker integration.
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.drawerlayout:drawerlayout:1.1.1")
+    implementation("androidx.core:core:1.13.1")
 }
