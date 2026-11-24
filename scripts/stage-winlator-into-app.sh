@@ -200,22 +200,28 @@ startup_new = """        final java.util.concurrent.atomic.AtomicReference<Strin
                 if (!isGenerateWineprefix()) {
                     startupStage.set("Подготовка файлов Wine");
                     android.util.Log.i("FarCry2Startup", startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                     setupWineSystemFiles();
                     startupStage.set("Распаковка графического драйвера");
                     android.util.Log.i("FarCry2Startup", startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                     extractGraphicsDriverFiles();
                     startupStage.set("Настройка звука Wine");
                     android.util.Log.i("FarCry2Startup", startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                     changeWineAudioDriver();
                 }
                 startupStage.set("Запуск X-сервера и Wine");
                 android.util.Log.i("FarCry2Startup", startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                 setupXEnvironment();
                 startupStage.set("Ожидание первого окна игры");
                 android.util.Log.i("FarCry2Startup", startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
             }
             catch (Throwable error) {
                 android.util.Log.e("FarCry2Startup", "Winlator startup failed at stage: " + startupStage.get(), error);
+                com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP ERROR at " + startupStage.get() + ": " + error.getClass().getName() + ": " + String.valueOf(error.getMessage()));
                 runOnUiThread(() -> {
                     String detail = "Этап: " + startupStage.get() + "\\n" + error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage());
                     new AlertDialog.Builder(this)
@@ -241,6 +247,7 @@ first_window_old = """                    preloaderDialog.closeOnUiThread();
 first_window_new = """                    preloaderDialog.closeOnUiThread();
                     startupFinished.set(true);
                     android.util.Log.i("FarCry2Startup", "First renderable X11 window appeared; startup complete");
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP COMPLETE: first renderable X11 window appeared");
                     flags[0] = true;"""
 if first_window_old not in s:
     raise SystemExit("First X11 window hook not found")
