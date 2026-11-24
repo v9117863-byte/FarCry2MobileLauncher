@@ -118,7 +118,34 @@ field_marker = "public class XServerDisplayActivity extends AppCompatActivity im
 field_patch = field_marker + "\n    private final java.util.concurrent.atomic.AtomicBoolean startupFinished = new java.util.concurrent.atomic.AtomicBoolean(false);"
 if field_marker not in s:
     raise SystemExit("Activity class declaration not found")
-s = s.replace(field_marker, field_patch, 1)
+ s = s.replace(field_marker, field_patch, 1)
+# Expose the active Winlator activity so the launcher Stop action can terminate the real Wine session.
+active_field = """
+    private static volatile XServerDisplayActivity activeInstance;
+    public static boolean stopActiveSession() {
+        final XServerDisplayActivity activity = activeInstance;
+        if (activity == null) return false;
+        activity.runOnUiThread(() -> {
+            com.winlator.core.ProcessHelper.appendDiagnosticLine("STOP REQUEST: finishing active Winlator session");
+            activity.finish();
+        });
+        return true;
+    }
+"""
+if "stopActiveSession()" not in s:
+    s = s.replace(field_patch, field_patch + active_field, 1)
+oncreate = "        super.onCreate(savedInstanceState);"
+if "activeInstance = this;" not in s:
+    if oncreate not in s: raise SystemExit("XServer onCreate marker not found")
+    s = s.replace(oncreate, oncreate + "\n        activeInstance = this;", 1)
+destroy_old = """    protected void onDestroy() {
+        winHandler.stop();"""
+destroy_new = """    protected void onDestroy() {
+        if (activeInstance == this) activeInstance = null;
+        com.winlator.core.ProcessHelper.appendDiagnosticLine("XServerDisplayActivity destroyed");
+        winHandler.stop();"""
+if destroy_old in s:
+    s = s.replace(destroy_old, destroy_new, 1)
 # The launcher intentionally omits upstream SettingsFragment. Enable persistent diagnostics
 # automatically so a user can retrieve the Wine/Box64 log without hidden settings.
 prefs_marker = "        preferences = PreferenceManager.getDefaultSharedPreferences(this);"
@@ -157,7 +184,9 @@ if old not in s:
 s = s.replace(old, new, 1)
 # Keep the failure visible instead of silently restarting the launcher when Wine exits.
 old_cb = 'guestProgramLauncherComponent.setTerminationCallback((status) -> exit());'
-new_cb = """guestProgramLauncherComponent.setTerminationCallback((status) -> runOnUiThread(() -> {
+new_cb = """guestProgramLauncherComponent.setTerminationCallback((status) -> {
+            com.winlator.core.ProcessHelper.appendDiagnosticLine("WINE PROCESS EXITED status=" + status);
+            runOnUiThread(() -> {
             new AlertDialog.Builder(this)
                 .setTitle("Far Cry 2 не запустилась")
                 .setMessage("Игровой процесс завершился с кодом " + status + ". Экран Winlator оставлен открытым, чтобы не возвращать тебя молча в лаунчер. Проверь EXE и настройки контейнера.")
@@ -165,7 +194,8 @@ new_cb = """guestProgramLauncherComponent.setTerminationCallback((status) -> run
                 .setNegativeButton("Остаться здесь", null)
                 .setCancelable(false)
                 .show();
-        }));"""
+            });
+        });"""
 if old_cb not in s:
     raise SystemExit("Winlator termination callback insertion point not found")
 s = s.replace(old_cb, new_cb, 1)
