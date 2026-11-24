@@ -122,6 +122,7 @@ if field_marker not in s:
 # Expose the active Winlator activity so the launcher Stop action can terminate the real Wine session.
 active_field = """
     private static volatile XServerDisplayActivity activeInstance;
+    public static boolean isSessionActive() { return activeInstance != null; }
     public static boolean stopActiveSession() {
         final XServerDisplayActivity activity = activeInstance;
         if (activity == null) return false;
