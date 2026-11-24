@@ -19,6 +19,11 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.documentfile.provider.DocumentFile
+import com.winlator.container.Container
+import com.winlator.container.ContainerManager
+import com.winlator.core.TarCompressorUtils
+import com.winlator.xenvironment.RootFS
+import com.winlator.xenvironment.RootFSInstaller
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -30,6 +35,7 @@ class MainActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("fc2", MODE_PRIVATE) }
     private var selectedTree: Uri? = null
     @Volatile private var gameProcess: Process? = null
+    @Volatile private var launchingGame = false
     @Volatile private var inputSocket: LocalSocket? = null
     private val requestFolder = 4102
     private val requestRuntimeFolder = 4103
@@ -217,73 +223,96 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun launchGame(): String {
+            val gameExePath = prefs.getString("game_path", null)
+                ?: return JSONObject().put("started", false).put("message", "Сначала импортируй файлы Far Cry 2").toString()
+            val gameExe = try { File(gameExePath).canonicalFile } catch (e: Exception) {
+                return JSONObject().put("started", false).put("message", "Некорректный путь к FarCry2.exe").toString()
+            }
+            if (!gameExe.isFile) {
+                return JSONObject().put("started", false).put("message", "FarCry2.exe не найден. Импортируй игру заново.").toString()
+            }
             synchronized(this@MainActivity) {
-                if (gameProcess?.isAlive == true) {
-                    return JSONObject().put("started", true).put("alreadyRunning", true)
-                        .put("message", "Игровой runtime уже запущен внутри Far Cry 2 Mobile").toString()
-                }
-                val runtimePath = prefs.getString("runtime_path", null)
-                    ?: return JSONObject().put("started", false).put("message", "Сначала импортируй runtime-пакет").toString()
-                val gameExePath = prefs.getString("game_path", null)
-                    ?: return JSONObject().put("started", false).put("message", "Сначала импортируй файлы Far Cry 2").toString()
-                val runtimeRoot = File(runtimePath).canonicalFile
-                val gameExe = File(gameExePath).canonicalFile
-                val manifestFile = File(runtimeRoot, "runtime-manifest.json")
-                if (!manifestFile.isFile || !gameExe.isFile) {
-                    return JSONObject().put("started", false).put("message", "Не найдены manifest runtime или FarCry2.exe").toString()
-                }
+                if (launchingGame) return JSONObject().put("started", false).put("preparing", true)
+                    .put("message", "Подготовка Winlator уже выполняется").toString()
+                launchingGame = true
+            }
+            worker.execute {
                 try {
-                    val manifest = JSONObject(manifestFile.readText(Charsets.UTF_8))
-                    fun runtimeFile(key: String): File {
-                        val rel = manifest.optString(key, "")
-                        require(rel.isNotBlank()) { "В runtime-manifest.json отсутствует $key" }
-                        val file = File(runtimeRoot, rel).canonicalFile
-                        require(file.toPath().startsWith(runtimeRoot.toPath()) && file.exists()) { "Компонент $key не найден или путь некорректен" }
-                        return file
-                    }
-                    val entrypoint = runtimeFile("entrypoint")
-                    runtimeFile("wine")
-                    runtimeFile("box86")
-                    runtimeFile("box64")
-                    runtimeFile("rootfs")
-                    runtimeFile("graphicsBackend")
-                    require(entrypoint.setExecutable(true, false) || entrypoint.canExecute()) {
-                        "Entry point runtime не является исполняемым"
-                    }
-                    val args = mutableListOf(entrypoint.absolutePath)
-                    val launchArgs = manifest.optJSONArray("launchArgs")
-                    if (launchArgs != null) {
-                        for (i in 0 until launchArgs.length()) {
-                            args.add(launchArgs.optString(i).replace("{gameExe}", gameExe.absolutePath)
-                                .replace("{gameDir}", gameExe.parentFile?.absolutePath ?: filesDir.absolutePath))
+                    val rootFS = RootFS.find(this@MainActivity)
+                    val rootDir = rootFS.rootDir
+                    if (!rootFS.isValid()) {
+                        if (rootDir.exists() && !rootDir.deleteRecursively()) {
+                            throw IllegalStateException("Не удалось очистить повреждённый RootFS")
                         }
-                    } else {
-                        args.add(gameExe.absolutePath)
+                        if (!rootDir.mkdirs() && !rootDir.isDirectory) {
+                            throw IllegalStateException("Не удалось создать каталог RootFS")
+                        }
+                        val extracted = TarCompressorUtils.extract(
+                            TarCompressorUtils.Type.ZSTD,
+                            this@MainActivity,
+                            RootFSInstaller.FILENAME,
+                            rootDir
+                        )
+                        if (!extracted) throw IllegalStateException("Не удалось распаковать RootFS. Проверь свободное место.")
+                        rootFS.createRFSVersionFile(RootFSInstaller.LATEST_VERSION.toInt())
                     }
-                    val log = File(filesDir, "runtime-launch.log")
-                    val builder = ProcessBuilder(args)
-                        .directory(runtimeRoot)
-                        .redirectErrorStream(true)
-                        .redirectOutput(ProcessBuilder.Redirect.appendTo(log))
-                    builder.environment().apply {
-                        put("FC2_GAME_EXE", gameExe.absolutePath)
-                        put("FC2_GAME_DIR", gameExe.parentFile?.absolutePath ?: filesDir.absolutePath)
-                        put("FC2_RUNTIME_DIR", runtimeRoot.absolutePath)
-                        put("FC2_ANDROID_ABI", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
-                        put("HOME", filesDir.absolutePath)
+                    if (!rootFS.isValid()) throw IllegalStateException("RootFS не прошёл проверку после установки")
+                    runOnUiThread {
+                        try {
+                            val manager = ContainerManager(this@MainActivity)
+                            val savedId = prefs.getInt("winlator_container_id", -1)
+                            val existing = manager.getContainerById(savedId)
+                            if (existing != null) {
+                                completeWinlatorLaunch(manager, existing, gameExe)
+                            } else {
+                                val config = JSONObject().put("name", "Far Cry 2")
+                                manager.createContainerAsync(config) { created ->
+                                    if (created == null) {
+                                        launchingGame = false
+                                        reportGameLaunch(false, "Не удалось создать Wine-контейнер. Проверь свободное место.")
+                                    } else {
+                                        completeWinlatorLaunch(manager, created, gameExe)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            launchingGame = false
+                            reportGameLaunch(false, "Ошибка подготовки Winlator: " + (e.message ?: "неизвестная ошибка"))
+                        }
                     }
-                    gameProcess = builder.start()
-                    getSharedPreferences("fc2", MODE_PRIVATE).edit().putBoolean("game_process_started", true).apply()
-                    return JSONObject().put("started", true)
-                        .put("message", "Runtime запущен как внутренний процесс приложения. Графический вывод зависит от backend пакета.")
-                        .put("log", log.absolutePath).toString()
                 } catch (e: Exception) {
-                    gameProcess = null
-                    return JSONObject().put("started", false)
-                        .put("message", "Не удалось запустить runtime: " + (e.message ?: "ошибка"))
-                        .toString()
+                    launchingGame = false
+                    val message = e.message ?: "Не удалось установить RootFS"
+                    runOnUiThread { reportGameLaunch(false, message) }
                 }
             }
+            return JSONObject().put("started", false).put("preparing", true)
+                .put("message", "Устанавливаю системные файлы Wine и подготавливаю контейнер. Первый запуск может занять несколько минут.").toString()
+        }
+
+        private fun completeWinlatorLaunch(manager: ContainerManager, container: Container, gameExe: File) {
+            try {
+                val gameDir = gameExe.parentFile?.canonicalFile
+                    ?: throw IllegalStateException("Не удалось определить папку игры")
+                // F: points directly to the imported game directory; Winlator creates the DOS-device symlink.
+                container.setDrives(Container.DEFAULT_DRIVES + "F:" + gameDir.absolutePath)
+                container.saveData()
+                prefs.edit().putInt("winlator_container_id", container.id).apply()
+                val intent = Intent(this@MainActivity, com.winlator.XServerDisplayActivity::class.java).apply {
+                    putExtra("container_id", container.id)
+                    putExtra("exec_path", gameExe.absolutePath)
+                }
+                launchingGame = false
+                reportGameLaunch(true, "Контейнер готов. Запускаю Far Cry 2 через встроенный Wine/Box64.")
+                startActivity(intent)
+            } catch (e: Exception) {
+                launchingGame = false
+                reportGameLaunch(false, "Не удалось запустить контейнер: " + (e.message ?: "ошибка"))
+            }
+        }
+
+        private fun reportGameLaunch(ok: Boolean, message: String) {
+            evaluate("window.onGameLaunchResult&&window.onGameLaunchResult(" + ok + "," + JSONObject.quote(message) + ")")
         }
 
         @JavascriptInterface fun stopGame(): String {
