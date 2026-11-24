@@ -95,20 +95,17 @@ started_new = """            pid = pidField.getInt(process);
 if started_old not in s: raise SystemExit("ProcessHelper process-start marker not found")
 s = s.replace(started_old, started_new, 1)
 import re
-pattern = r'        }\s*catch \(Exception e\) \{\}\s*return pid;\s*}\s*private static void createDebugThread'
+pattern = r'        }\s*catch \(Exception e\) \{\}\s*return pid;\s*}'
 match = re.search(pattern, s)
 if not match:
-    raise SystemExit("ProcessHelper exec catch block not found (regex)")
+    raise SystemExit("ProcessHelper exec catch block not found (relaxed regex)")
 catch_new = """        }
         catch (Exception e) {
             appendDiagnosticLine("ProcessHelper.exec ERROR: " + e.getClass().getName() + ": " + String.valueOf(e.getMessage()));
             android.util.Log.e("FarCry2Diagnostics", "ProcessHelper.exec failed", e);
         }
         return pid;
-    }
-
-    private static void createDebugThread"""
-s = s[:match.start()] + catch_new + s[match.end():]
+    }"""
 p.write_text(s)
 PY
 # Fail gracefully instead of crashing if the saved container or imported EXE vanished.
