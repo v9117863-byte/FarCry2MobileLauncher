@@ -10,6 +10,13 @@ android {
         applicationId = "com.farcry2.mobile"
         minSdk = 26
         targetSdk = 35
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
         versionCode = 9
         versionName = "0.9.0-runtime-host"
     }
