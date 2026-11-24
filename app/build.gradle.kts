@@ -17,10 +17,12 @@ android {
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+    if (file("src/main/cpp/CMakeLists.txt").isFile) {
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+                version = "3.22.1"
+            }
         }
     }
 
