@@ -114,6 +114,12 @@ class MainActivity : Activity() {
                         }
                     }
                     if (missing.isNotEmpty()) throw IllegalStateException("Runtime неполный. Отсутствуют компоненты: " + missing.joinToString())
+                    listOf("entrypoint", "wine", "box86", "box64").forEach { key ->
+                        val executable = File(target, json.getString(key))
+                        if (executable.isFile && !executable.setExecutable(true, false) && !executable.canExecute()) {
+                            throw IllegalStateException("Не удалось сделать исполняемым компонент: " + key)
+                        }
+                    }
                     val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
                     val supported = json.optJSONArray("supportedAbis")
                     if (supported != null && (0 until supported.length()).none { supported.optString(it) == abi }) {
