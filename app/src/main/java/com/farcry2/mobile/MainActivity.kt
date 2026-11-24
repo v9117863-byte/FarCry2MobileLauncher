@@ -75,6 +75,18 @@ class MainActivity : Activity() {
         web.loadUrl("file:///android_asset/index.html")
     }
 
+    private fun appendLaunchLog(message: String) {
+        try {
+            val dir = getExternalFilesDir(null) ?: filesDir
+            val logFile = File(dir, "fc2-launch.log")
+            val line = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US)
+                .format(java.util.Date()) + "  " + message.replace("\\n", " ") + "\\n"
+            FileOutputStream(logFile, true).use { it.write(line.toByteArray(Charsets.UTF_8)) }
+        } catch (e: Exception) {
+            android.util.Log.e("FC2-Launch", "Cannot write launch log", e)
+        }
+    }
+
     inner class AndroidBridge {
         @JavascriptInterface fun getDeviceInfo(): String {
             val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
@@ -343,6 +355,7 @@ class MainActivity : Activity() {
                     putExtra("exec_path", gameExe.absolutePath)
                 }
                 launchingGame = false
+                appendLaunchLog("START_ACTIVITY containerId=${container.id}, exe=${gameExe.absolutePath}")
                 reportGameProgress(98, "Передаю FarCry2.exe игровой системе")
                 reportGameLaunch(true, "Игровая сессия готова. Запускаю Far Cry 2.")
                 startActivity(intent)
@@ -375,12 +388,14 @@ class MainActivity : Activity() {
         private fun reportGameProgress(percent: Int, message: String) {
             launchLastPercent = percent.coerceIn(0, 100)
             launchStage = message
+            appendLaunchLog("PROGRESS $percent%: $message")
             runOnUiThread {
                 evaluate("window.onGameLaunchProgress&&window.onGameLaunchProgress(" + percent.coerceIn(0, 100) + "," + JSONObject.quote(message) + ")")
             }
         }
 
         private fun reportGameLaunch(ok: Boolean, message: String) {
+            appendLaunchLog("RESULT ok=$ok: $message")
             runOnUiThread {
                 evaluate("window.onGameLaunchResult&&window.onGameLaunchResult(" + ok + "," + JSONObject.quote(message) + ")")
             }
