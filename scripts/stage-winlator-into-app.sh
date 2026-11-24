@@ -84,11 +84,8 @@ if exec_old not in s: raise SystemExit("ProcessHelper exec start marker not foun
 s = s.replace(exec_old, exec_new, 1)
 started_old = """            pid = pidField.getInt(process);
             pidField.setAccessible(false);
-
-            if (!debugCallbacks.isEmpty()) {
-                createDebugThread(process.getInputStream());
-                createDebugThread(process.getErrorStream());
-            }"""
+            createDebugThread(process.getInputStream());
+            createDebugThread(process.getErrorStream());"""
 started_new = """            pid = pidField.getInt(process);
             pidField.setAccessible(false);
             appendDiagnosticLine("Process started; pid=" + pid);
