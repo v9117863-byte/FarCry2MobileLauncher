@@ -29,6 +29,13 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
 
+      - name: Verify map and manual are packaged
+        run: |
+          unzip -p app/build/outputs/apk/debug/app-debug.apk assets/index.html > /tmp/fc2-index.html
+          grep -q 'WORLD MAP' /tmp/fc2-index.html
+          grep -q 'FIELD MANUAL' /tmp/fc2-index.html
+          grep -q 'chooseWorldMap' /tmp/fc2-index.html
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
