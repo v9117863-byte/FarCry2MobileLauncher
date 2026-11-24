@@ -17,17 +17,28 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 needle = "    private static void createDebugThread(final InputStream inputStream) {"
-method = """    public static synchronized void appendDiagnosticLine(String line) {
-        java.io.File logFile = new java.io.File(
-            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS),
-            "Winlator/logs.txt"
+method = """    private static java.io.File getDiagnosticLogFile() {
+        java.io.File external = new java.io.File(
+            android.os.Environment.getExternalStorageDirectory(),
+            "Android/data/com.farcry2.mobile/files/Winlator/logs.txt"
         );
+        java.io.File parent = external.getParentFile();
+        if (parent != null && (parent.isDirectory() || parent.mkdirs())) return external;
+        return new java.io.File("/data/data/com.farcry2.mobile/files/Winlator/logs.txt");
+    }
+
+    public static synchronized void appendDiagnosticLine(String line) {
+        java.io.File logFile = getDiagnosticLogFile();
+        String entry = "[" + new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(new java.util.Date()) + "] " + line;
+        android.util.Log.i("FarCry2Diagnostics", line);
         try {
             java.io.File parent = logFile.getParentFile();
-            if (parent != null && !parent.isDirectory()) parent.mkdirs();
+            if (parent != null && !parent.isDirectory() && !parent.mkdirs())
+                throw new java.io.IOException("Cannot create " + parent);
             try (java.io.BufferedWriter writer = new java.io.BufferedWriter(new java.io.FileWriter(logFile, true))) {
-                writer.write("[" + new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(new java.util.Date()) + "] " + line);
+                writer.write(entry);
                 writer.newLine();
+                writer.flush();
             }
         }
         catch (Exception error) {
@@ -59,6 +70,46 @@ thread_new = '''            createDebugThread(process.getInputStream());
 if thread_old not in s:
     raise SystemExit("ProcessHelper debug thread gate not found")
 s = s.replace(thread_old, thread_new, 1)
+# Add explicit process-launch markers and preserve exceptions that upstream silently swallowed.
+exec_old = """    public static int exec(String command, EnvVars envVars, File workingDir, Callback<Integer> terminationCallback) {
+        int pid = -1;
+        try {
+            ProcessBuilder processBuilder = (new ProcessBuilder(splitCommand(command))).directory(workingDir);"""
+exec_new = """    public static int exec(String command, EnvVars envVars, File workingDir, Callback<Integer> terminationCallback) {
+        int pid = -1;
+        appendDiagnosticLine("ProcessHelper.exec BEGIN: " + command);
+        try {
+            ProcessBuilder processBuilder = (new ProcessBuilder(splitCommand(command))).directory(workingDir);"""
+if exec_old not in s: raise SystemExit("ProcessHelper exec start marker not found")
+s = s.replace(exec_old, exec_new, 1)
+started_old = """            pid = pidField.getInt(process);
+            pidField.setAccessible(false);
+
+            createDebugThread(process.getInputStream());"""
+started_new = """            pid = pidField.getInt(process);
+            pidField.setAccessible(false);
+            appendDiagnosticLine("Process started; pid=" + pid);
+
+            createDebugThread(process.getInputStream());"""
+if started_old not in s: raise SystemExit("ProcessHelper process-start marker not found")
+s = s.replace(started_old, started_new, 1)
+catch_old = """        }
+        catch (Exception e) {}
+        return pid;
+    }
+
+    private static void createDebugThread"""
+catch_new = """        }
+        catch (Exception e) {
+            appendDiagnosticLine("ProcessHelper.exec ERROR: " + e.getClass().getName() + ": " + String.valueOf(e.getMessage()));
+            android.util.Log.e("FarCry2Diagnostics", "ProcessHelper.exec failed", e);
+        }
+        return pid;
+    }
+
+    private static void createDebugThread"""
+if catch_old not in s: raise SystemExit("ProcessHelper silent catch marker not found")
+s = s.replace(catch_old, catch_new, 1)
 p.write_text(s)
 PY
 # Fail gracefully instead of crashing if the saved container or imported EXE vanished.
