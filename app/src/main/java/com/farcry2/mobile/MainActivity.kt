@@ -317,6 +317,7 @@ class MainActivity : Activity() {
                 }
                 driveMap.append("F:").append(gameDir.absolutePath)
                 container.setDrives(driveMap.toString())
+                container.setScreenSize(resolveRequestedScreenSize())
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
                 val intent = Intent(this@MainActivity, com.winlator.XServerDisplayActivity::class.java).apply {
@@ -329,6 +330,26 @@ class MainActivity : Activity() {
             } catch (e: Exception) {
                 launchingGame = false
                 reportGameLaunch(false, "Не удалось запустить контейнер: " + (e.message ?: "ошибка"))
+            }
+        }
+
+        private fun resolveRequestedScreenSize(): String {
+            val settings = try {
+                prefs.getString("launch_settings", null)?.let { JSONObject(it) }
+            } catch (_: Exception) { null }
+            return when (settings?.optString("resolution", "540p") ?: "540p") {
+                "480p" -> "854x480"
+                "600p" -> "1066x600"
+                "720p" -> "1280x720"
+                "Native" -> {
+                    val metrics = android.util.DisplayMetrics()
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay.getRealMetrics(metrics)
+                    val width = maxOf(metrics.widthPixels, metrics.heightPixels)
+                    val height = minOf(metrics.widthPixels, metrics.heightPixels)
+                    "${width}x${height}"
+                }
+                else -> "960x540"
             }
         }
 
