@@ -1,0 +1,1 @@
+Runtime payload is intentionally not bundled. A production APK needs a complete, licensed Android Windows compatibility runtime and runtime-manifest.json containing entrypoint, wine, box86, box64, rootfs and graphicsBackend paths. See RUNTIME_INTEGRATION.md. No fake marker manifest is included; PLAY remains blocked until real payload validation succeeds.
