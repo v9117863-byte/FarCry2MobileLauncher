@@ -27,6 +27,7 @@ class MainActivity : Activity() {
     private val worker = Executors.newSingleThreadExecutor()
     private val prefs by lazy { getSharedPreferences("fc2", MODE_PRIVATE) }
     private var selectedTree: Uri? = null
+    @Volatile private var gameProcess: Process? = null
     private val requestFolder = 4102
     private val requestRuntimeFolder = 4103
 
@@ -187,16 +188,85 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun launchGame(): String {
-            val status = JSONObject(getRuntimeBundleStatus())
-            if (!status.optBoolean("imported") && !status.optBoolean("bundled")) {
-                return JSONObject().put("started", false)
-                    .put("message", "Сначала импортируй полный runtime-пакет. Без Wine, Box86/Box64, RootFS и графического backend игра не запускается.")
-                    .toString()
+            synchronized(this@MainActivity) {
+                if (gameProcess?.isAlive == true) {
+                    return JSONObject().put("started", true).put("alreadyRunning", true)
+                        .put("message", "Игровой runtime уже запущен внутри Far Cry 2 Mobile").toString()
+                }
+                val runtimePath = prefs.getString("runtime_path", null)
+                    ?: return JSONObject().put("started", false).put("message", "Сначала импортируй runtime-пакет").toString()
+                val gameExePath = prefs.getString("game_path", null)
+                    ?: return JSONObject().put("started", false).put("message", "Сначала импортируй файлы Far Cry 2").toString()
+                val runtimeRoot = File(runtimePath).canonicalFile
+                val gameExe = File(gameExePath).canonicalFile
+                val manifestFile = File(runtimeRoot, "runtime-manifest.json")
+                if (!manifestFile.isFile || !gameExe.isFile) {
+                    return JSONObject().put("started", false).put("message", "Не найдены manifest runtime или FarCry2.exe").toString()
+                }
+                try {
+                    val manifest = JSONObject(manifestFile.readText(Charsets.UTF_8))
+                    fun runtimeFile(key: String): File {
+                        val rel = manifest.optString(key, "")
+                        require(rel.isNotBlank()) { "В runtime-manifest.json отсутствует $key" }
+                        val file = File(runtimeRoot, rel).canonicalFile
+                        require(file.toPath().startsWith(runtimeRoot.toPath()) && file.exists()) { "Компонент $key не найден или путь некорректен" }
+                        return file
+                    }
+                    val entrypoint = runtimeFile("entrypoint")
+                    runtimeFile("wine")
+                    runtimeFile("box86")
+                    runtimeFile("box64")
+                    runtimeFile("rootfs")
+                    runtimeFile("graphicsBackend")
+                    require(entrypoint.setExecutable(true, false) || entrypoint.canExecute()) {
+                        "Entry point runtime не является исполняемым"
+                    }
+                    val args = mutableListOf(entrypoint.absolutePath)
+                    val launchArgs = manifest.optJSONArray("launchArgs")
+                    if (launchArgs != null) {
+                        for (i in 0 until launchArgs.length()) {
+                            args.add(launchArgs.optString(i).replace("{gameExe}", gameExe.absolutePath)
+                                .replace("{gameDir}", gameExe.parentFile?.absolutePath ?: filesDir.absolutePath))
+                        }
+                    } else {
+                        args.add(gameExe.absolutePath)
+                    }
+                    val log = File(filesDir, "runtime-launch.log")
+                    val builder = ProcessBuilder(args)
+                        .directory(runtimeRoot)
+                        .redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.appendTo(log))
+                    builder.environment().apply {
+                        put("FC2_GAME_EXE", gameExe.absolutePath)
+                        put("FC2_GAME_DIR", gameExe.parentFile?.absolutePath ?: filesDir.absolutePath)
+                        put("FC2_RUNTIME_DIR", runtimeRoot.absolutePath)
+                        put("FC2_ANDROID_ABI", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
+                        put("HOME", filesDir.absolutePath)
+                    }
+                    gameProcess = builder.start()
+                    getSharedPreferences("fc2", MODE_PRIVATE).edit().putBoolean("game_process_started", true).apply()
+                    return JSONObject().put("started", true)
+                        .put("message", "Runtime запущен как внутренний процесс приложения. Графический вывод зависит от backend пакета.")
+                        .put("log", log.absolutePath).toString()
+                } catch (e: Exception) {
+                    gameProcess = null
+                    return JSONObject().put("started", false)
+                        .put("message", "Не удалось запустить runtime: " + (e.message ?: "ошибка"))
+                        .toString()
+                }
             }
-            return JSONObject().put("started", false)
-                .put("message", "Runtime найден, но адаптер запуска Windows-процесса и графический вывод ещё не реализованы. Игра пока не запущена.")
-                .toString()
         }
+
+        @JavascriptInterface fun stopGame(): String {
+            synchronized(this@MainActivity) {
+                val process = gameProcess
+                if (process?.isAlive == true) process.destroy()
+                gameProcess = null
+                return JSONObject().put("stopped", true).put("message", "Внутренний runtime остановлен").toString()
+            }
+        }
+
+        @JavascriptInterface fun isGameRunning(): Boolean = gameProcess?.isAlive == true
 
         @JavascriptInterface fun saveLaunchSettings(json: String) {
             prefs.edit().putString("launch_settings", json).apply()
@@ -286,6 +356,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        gameProcess?.let { if (it.isAlive) it.destroy() }
         worker.shutdown()
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
