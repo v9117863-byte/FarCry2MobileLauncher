@@ -403,16 +403,23 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun stopGame(): String {
             synchronized(this@MainActivity) {
+                val stoppedWinlator = try {
+                    com.winlator.XServerDisplayActivity.stopActiveSession()
+                } catch (_: Exception) { false }
                 val process = gameProcess
                 if (process?.isAlive == true) process.destroy()
                 gameProcess = null
                 try { inputSocket?.close() } catch (_: Exception) { }
                 inputSocket = null
-                return JSONObject().put("stopped", true).put("message", "Игровая сессия остановлена").toString()
+                val stopped = stoppedWinlator || process?.isAlive == true
+                appendLaunchLog("STOP_REQUEST stopped=$stopped")
+                return JSONObject().put("stopped", stopped)
+                    .put("message", if (stopped) "Игровая сессия остановлена" else "Активная игровая сессия не найдена").toString()
             }
         }
 
-        @JavascriptInterface fun isGameRunning(): Boolean = gameProcess?.isAlive == true
+        @JavascriptInterface fun isGameRunning(): Boolean =
+            gameProcess?.isAlive == true || try { com.winlator.XServerDisplayActivity.isSessionActive() } catch (_: Exception) { false }
 
         @JavascriptInterface fun saveLaunchSettings(json: String) {
             prefs.edit().putString("launch_settings", json).apply()
