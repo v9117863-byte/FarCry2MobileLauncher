@@ -183,7 +183,7 @@ class MainActivity : Activity() {
             val valid = imported && manifest?.isFile == true
             val bundled = assets.list("runtime")?.contains("runtime-manifest.json") == true
             return JSONObject().put("bundled", bundled).put("imported", valid)
-                .put("components", assets.list("runtime")?.toList() ?: emptyList()).toString()
+                .put("components", assets.list("runtime")?.toList() ?: emptyList<String>()).toString()
         }
 
         @JavascriptInterface fun launchGame(): String {
