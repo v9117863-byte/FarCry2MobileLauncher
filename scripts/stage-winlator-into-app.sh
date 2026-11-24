@@ -16,7 +16,9 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 if "import android.widget.Toast;" not in s:
-    s = s.replace("import android.widget.Spinner;", "import android.widget.Spinner;\nimport android.widget.Toast;")
+    s = s.replace("import android.os.Bundle;", "import android.os.Bundle;\nimport android.widget.Toast;")
+if "import java.io.File;" not in s:
+    s = s.replace("import java.io.", "import java.io.File;\nimport java.io.", 1)
 old = """            container = containerManager.getContainerById(getIntent().getIntExtra("container_id", 0));
             containerManager.activateContainer(container);"""
 new = """            container = containerManager.getContainerById(getIntent().getIntExtra("container_id", 0));
