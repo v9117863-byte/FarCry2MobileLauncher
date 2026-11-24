@@ -2,6 +2,11 @@
 set -euo pipefail
 UPSTREAM="${1:?path to pinned Winlator checkout required}"
 APP="app/src/main"
+UPSTREAM_NAMESPACE=$(grep -E "namespace ['\"]com\.winlator['\"]" "$UPSTREAM/app/build.gradle" | head -n1 || true)
+if [[ -z "$UPSTREAM_NAMESPACE" ]]; then
+  echo "Pinned Winlator namespace was not found; generated R imports will not resolve." >&2
+  exit 3
+fi
 mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/"
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
