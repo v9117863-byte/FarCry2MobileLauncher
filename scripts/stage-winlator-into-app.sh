@@ -17,7 +17,7 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 field_marker = "public class XServerDisplayActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {"
-field_patch = field_marker + "\\n    private final java.util.concurrent.atomic.AtomicBoolean startupFinished = new java.util.concurrent.atomic.AtomicBoolean(false);"
+field_patch = field_marker + "\n    private final java.util.concurrent.atomic.AtomicBoolean startupFinished = new java.util.concurrent.atomic.AtomicBoolean(false);"
 if field_marker not in s:
     raise SystemExit("Activity class declaration not found")
 s = s.replace(field_marker, field_patch, 1)
