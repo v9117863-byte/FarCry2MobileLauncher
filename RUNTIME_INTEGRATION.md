@@ -1,22 +1,67 @@
-# Runtime integration — v0.8.0
+# Runtime integration — v0.10.0
 
-## Current status
-The Android host can extract a bundled runtime from assets/runtime, validate its manifest, launch the declared entrypoint, and forward controller events to its local input socket. This is a host contract, not a complete emulator.
+## Verified launcher state
 
-## Runtime payload is missing
-No Wine, Box86/Box64, root filesystem, Direct3D translation layer, GPU driver, X server, audio stack, or runtime-side input daemon is included. Far Cry 2 cannot currently launch from this repository.
+The Android launcher host builds successfully (GitHub Actions run #16). The host can validate a runtime manifest, start its declared entrypoint, and send newline-delimited JSON input messages to the Android abstract local socket `fc2_runtime_input`.
 
-## Runtime requirements
-A complete, ABI-compatible runtime must be built or obtained separately, with licenses and notices preserved. Winlator is a relevant upstream reference: https://github.com/brunodev85/winlator
+This is only the Android-side host contract. It is **not** a bundled Windows compatibility runtime and does not yet provide a working Far Cry 2 launch.
 
-The runtime entrypoint must start an input daemon accepting newline-delimited UTF-8 JSON on Android abstract local socket fc2_runtime_input, then translate controller axes/buttons into X11/Wine mouse and keyboard events.
+## Runtime payload still required
 
-## Packaging
-1. Build/obtain a complete licensed runtime for arm64-v8a.
-2. Add runtime-manifest.json with entrypoint, wine, box86, box64, rootfs and graphicsBackend paths.
-3. Ensure entrypoint is executable.
-4. Run python3 tools/package-runtime.py /path/to/runtime-root.
-5. Build with -PrequireBundledRuntime=true.
-6. Test on actual Adreno and Mali devices. Do not force Turnip on Mali without validation.
+The repository does not contain a complete, tested set of:
+- Wine and its 32-bit Windows support;
+- Box86/Box64 and their loader/runtime dependencies;
+- Linux root filesystem and PRoot/environment setup;
+- Mesa plus a device-appropriate graphics backend (Turnip for supported Adreno devices, or a suitable Mali path);
+- DXVK/WineD3D components for Direct3D 9/10;
+- X server/display integration and Android surface lifecycle;
+- audio bridge and runtime-side controller input daemon.
 
-Far Cry 2 is a 32-bit Windows game using Direct3D 9/10. Wine compatibility and performance are not guaranteed; test on each GPU/runtime combination.
+The manifest and ProcessBuilder host code cannot replace these components. In particular, starting a Linux entrypoint as an Android child process does not by itself create a display surface or a working Wine environment.
+
+## Winlator upstream audit
+
+Reference project: https://github.com/brunodev85/winlator-app
+
+The upstream repository is a full Android application, not a small embeddable graphics library. The inspected main branch contains about 1,056 tracked tree entries and includes:
+- `XServerDisplayActivity`, `XServerView`, `XServerComponent`;
+- `ContainerManager`, `RootFS`, `RootFSInstaller`, Wine setup/management classes;
+- a native CMake build with multiple native subprojects (including renderer and Winlator-specific components);
+- JNI libraries, Android resources, and additional runtime/asset handling.
+
+Its app module uses a separate application namespace, native build configuration (CMake 3.22.1 / NDK 24), and AndroidX/Material/compression dependencies. `XServerView` alone is not sufficient: it depends on the X server, container/environment, native libraries, resources, and lifecycle orchestration.
+
+## Integration decision
+
+Do not copy only `XServerView` or create a fake SurfaceView placeholder. The viable one-APK path is to integrate the Winlator application engine as the base of this app (or port its complete app module), then bring the Far Cry 2 launcher UI and game-import flow into that same application. This keeps the user's requirement of one installed app without launching a separate Winlator app.
+
+The integration must preserve the upstream LGPL-2.1 license notices and provide corresponding source/changes for redistributed LGPL components. Verify the exact license files for every imported component before packaging.
+
+## Required integration sequence
+
+1. Establish a reproducible build from the upstream Winlator source and record its exact commit.
+2. Merge the Far Cry 2 launcher UI/import flow into the Winlator-based app, retaining one application ID and one APK.
+3. Connect game selection to a Winlator container profile with a 32-bit Windows environment.
+4. Add Far Cry 2 launch configuration and map the in-app touch controller to the X server input path.
+5. Verify rendering, audio, suspend/resume, and stop/cleanup on physical Adreno and Mali devices.
+6. Only label an APK as a game-capable build after a real Far Cry 2 process reaches visible in-app gameplay.
+
+## Existing host packaging contract
+
+A standalone runtime bundle (if retained for experiments) uses `runtime-manifest.json` with the keys `entrypoint`, `wine`, `box86`, `box64`, `rootfs`, and `graphicsBackend`. The packaging helper is:
+
+```sh
+python3 tools/package-runtime.py /path/to/runtime-root
+```
+
+Build-time payload validation can be required with:
+
+```sh
+./gradlew assembleDebug -PrequireBundledRuntime=true
+```
+
+Do not treat a manifest passing validation as proof that the runtime works.
+
+## Device and compatibility notes
+
+Far Cry 2 is a 32-bit Windows game with Direct3D 9/10-era rendering. Runtime compatibility and performance are not guaranteed. Test the same game build and settings on each GPU/backend combination. Do not force Turnip on Mali devices.
