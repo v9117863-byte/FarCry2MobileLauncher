@@ -1,0 +1,11 @@
+{
+  "engine": "Wine + Box86/Box64 + DX9 graphics backend",
+  "version": "PINNED_RUNTIME_BUILD",
+  "entrypoint": "bin/fc2-runtime-launcher",
+  "wine": "wine/bin/wine",
+  "box86": "bin/box86",
+  "box64": "bin/box64",
+  "rootfs": "rootfs",
+  "graphicsBackend": "graphics",
+  "supportedAbis": ["arm64-v8a"]
+}
