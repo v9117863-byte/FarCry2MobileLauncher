@@ -28,6 +28,7 @@ class MainActivity : Activity() {
     private val prefs by lazy { getSharedPreferences("fc2", MODE_PRIVATE) }
     private var selectedTree: Uri? = null
     private val requestFolder = 4102
+    private val requestRuntimeFolder = 4103
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,6 +80,56 @@ class MainActivity : Activity() {
             }
         }
 
+        @JavascriptInterface fun chooseRuntimeFolder() {
+            runOnUiThread {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                startActivityForResult(intent, requestRuntimeFolder)
+            }
+        }
+
+        @JavascriptInterface fun importRuntimeFolder() {
+            val tree = prefs.getString("runtime_tree_uri", null)?.let(Uri::parse)
+            if (tree == null) {
+                runOnUiThread { evaluate("window.onRuntimeResult&&window.onRuntimeResult(false,'Сначала выбери папку runtime')") }
+                return
+            }
+            worker.execute {
+                try {
+                    val root = DocumentFile.fromTreeUri(this@MainActivity, tree)
+                        ?: throw IllegalStateException("Не удалось открыть папку runtime")
+                    val target = File(filesDir, "runtime")
+                    if (target.exists() && !target.deleteRecursively()) throw IllegalStateException("Не удалось очистить старую папку runtime")
+                    if (!target.mkdirs()) throw IllegalStateException("Не удалось создать папку runtime")
+                    copyDocumentContents(root, target)
+                    val manifest = File(target, "runtime-manifest.json")
+                    if (!manifest.isFile) throw IllegalStateException("Не найден runtime-manifest.json в корне выбранной папки")
+                    val json = JSONObject(manifest.readText(Charsets.UTF_8))
+                    val required = listOf("entrypoint", "wine", "box86", "box64", "rootfs", "graphicsBackend")
+                    val missing = required.filter { key ->
+                        val rel = json.optString(key, "")
+                        if (rel.isBlank()) true else {
+                            val candidate = File(target, rel).canonicalFile
+                            !candidate.toPath().startsWith(target.canonicalFile.toPath()) || !candidate.exists()
+                        }
+                    }
+                    if (missing.isNotEmpty()) throw IllegalStateException("Runtime неполный. Отсутствуют компоненты: " + missing.joinToString())
+                    val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+                    val supported = json.optJSONArray("supportedAbis")
+                    if (supported != null && (0 until supported.length()).none { supported.optString(it) == abi }) {
+                        throw IllegalStateException("Пакет runtime не поддерживает ABI устройства: " + abi)
+                    }
+                    prefs.edit().putBoolean("runtime_imported", true).putString("runtime_path", target.absolutePath).apply()
+                    runOnUiThread { evaluate("window.onRuntimeResult&&window.onRuntimeResult(true,'Runtime скопирован и проверен: все компоненты найдены')") }
+                } catch (e: Exception) {
+                    File(filesDir, "runtime").deleteRecursively()
+                    prefs.edit().putBoolean("runtime_imported", false).remove("runtime_path").apply()
+                    val msg = JSONObject.quote(e.message ?: "Ошибка импорта runtime")
+                    runOnUiThread { evaluate("window.onRuntimeResult&&window.onRuntimeResult(false," + msg + ")") }
+                }
+            }
+        }
+
         @JavascriptInterface fun importGameFiles() {
             val tree = selectedTree
             if (tree == null) {
@@ -120,14 +171,24 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun getRuntimeBundleStatus(): String {
-            val names = assets.list("runtime")?.toList() ?: emptyList()
-            val bundled = names.contains("runtime-manifest.json")
-            return JSONObject().put("bundled", bundled).put("components", names).toString()
+            val imported = prefs.getBoolean("runtime_imported", false)
+            val path = prefs.getString("runtime_path", null)
+            val manifest = path?.let { File(it, "runtime-manifest.json") }
+            val valid = imported && manifest?.isFile == true
+            val bundled = assets.list("runtime")?.contains("runtime-manifest.json") == true
+            return JSONObject().put("bundled", bundled).put("imported", valid)
+                .put("components", assets.list("runtime")?.toList() ?: emptyList()).toString()
         }
 
         @JavascriptInterface fun launchGame(): String {
+            val status = JSONObject(getRuntimeBundleStatus())
+            if (!status.optBoolean("imported") && !status.optBoolean("bundled")) {
+                return JSONObject().put("started", false)
+                    .put("message", "Сначала импортируй полный runtime-пакет. Без Wine, Box86/Box64, RootFS и графического backend игра не запускается.")
+                    .toString()
+            }
             return JSONObject().put("started", false)
-                .put("message", "Windows runtime ещё не встроен. Лаунчер готов, но Far Cry 2 пока не запускается.")
+                .put("message", "Runtime найден, но адаптер запуска Windows-процесса и графический вывод ещё не реализованы. Игра пока не запущена.")
                 .toString()
         }
 
@@ -172,6 +233,22 @@ class MainActivity : Activity() {
         return null
     }
 
+    private fun copyDocumentContents(source: DocumentFile, destination: File) {
+        source.listFiles().forEach { child ->
+            val name = child.name ?: throw IllegalStateException("У файла runtime отсутствует имя")
+            val out = File(destination, name).canonicalFile
+            if (!out.toPath().startsWith(destination.canonicalFile.toPath())) throw IllegalStateException("Недопустимый путь в runtime")
+            if (child.isDirectory) {
+                if (!out.exists() && !out.mkdirs()) throw IllegalStateException("Не удалось создать " + child.name)
+                copyDocumentContents(child, out)
+            } else if (child.isFile) {
+                contentResolver.openInputStream(child.uri)?.use { input ->
+                    FileOutputStream(out).use { output -> input.copyTo(output, 1024 * 1024) }
+                } ?: throw IllegalStateException("Не удалось прочитать " + child.name)
+            }
+        }
+    }
+
     private fun copyTree(source: DocumentFile, destination: File) {
         if (source.isDirectory) {
             val dir = File(destination, source.name ?: "data").apply { mkdirs() }
@@ -187,13 +264,18 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == requestFolder && resultCode == Activity.RESULT_OK) {
+        if ((requestCode == requestFolder || requestCode == requestRuntimeFolder) && resultCode == Activity.RESULT_OK) {
             val uri = data?.data ?: return
             val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             contentResolver.takePersistableUriPermission(uri, flags)
-            selectedTree = uri
-            prefs.edit().putString("game_tree_uri", uri.toString()).putBoolean("game_imported", false).apply()
-            evaluate("window.onGameFolderResult&&window.onGameFolderResult(true,'Папка игры выбрана')")
+            if (requestCode == requestFolder) {
+                selectedTree = uri
+                prefs.edit().putString("game_tree_uri", uri.toString()).putBoolean("game_imported", false).apply()
+                evaluate("window.onGameFolderResult&&window.onGameFolderResult(true,'Папка игры выбрана')")
+            } else {
+                prefs.edit().putString("runtime_tree_uri", uri.toString()).putBoolean("runtime_imported", false).apply()
+                evaluate("window.onRuntimeResult&&window.onRuntimeResult(true,'Папка runtime выбрана. Нажми IMPORT RUNTIME')")
+            }
         }
     }
 
