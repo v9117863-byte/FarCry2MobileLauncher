@@ -36,6 +36,9 @@ class MainActivity : Activity() {
     private var selectedTree: Uri? = null
     @Volatile private var gameProcess: Process? = null
     @Volatile private var launchingGame = false
+    @Volatile private var launchStage = "Ожидание"
+    @Volatile private var launchLastPercent = 0
+    @Volatile private var launchWatchdogReported = false
     @Volatile private var inputSocket: LocalSocket? = null
     private val requestFolder = 4102
     private val requestRuntimeFolder = 4103
@@ -247,10 +250,17 @@ class MainActivity : Activity() {
             }
             synchronized(this@MainActivity) {
                 if (launchingGame) return JSONObject().put("started", false).put("preparing", true)
-                    .put("message", "Подготовка игры уже выполняется").toString()
+                    .put("message", "Подготовка игры уже выполняется: " + launchStage).toString()
                 launchingGame = true
+                launchWatchdogReported = false
             }
             reportGameProgress(4, "Проверяю игровые файлы и окружение")
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                if (launchingGame && !launchWatchdogReported) {
+                    launchWatchdogReported = true
+                    reportGameProgress(launchLastPercent, "ДОЛГОЕ ОЖИДАНИЕ: этап «" + launchStage + "» не ответил за 3 минуты. Пришли скриншот этого сообщения.")
+                }
+            }, 180_000L)
             worker.execute {
                 try {
                     reportGameProgress(10, "Проверяю системные файлы")
@@ -363,6 +373,8 @@ class MainActivity : Activity() {
         }
 
         private fun reportGameProgress(percent: Int, message: String) {
+            launchLastPercent = percent.coerceIn(0, 100)
+            launchStage = message
             runOnUiThread {
                 evaluate("window.onGameLaunchProgress&&window.onGameLaunchProgress(" + percent.coerceIn(0, 100) + "," + JSONObject.quote(message) + ")")
             }
