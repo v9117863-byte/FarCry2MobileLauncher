@@ -59,7 +59,7 @@ for name in sys.argv[1:]:
     s = p.read_text()
     if 'name="starting_up"' in s:
         import re
-        s = re.sub(r'(<string name="starting_up">).*?(</string>)', r'\\1Preparing Far Cry 2...\\2', s, count=1)
+        s = re.sub(r'(<string name="starting_up">).*?(</string>)', lambda m: m.group(1) + "Preparing Far Cry 2..." + m.group(2), s, count=1)
     if 'name="loading"' in s:
         import re
         label = "Preparing Far Cry 2..." if "/values/" in name else "Подготовка Far Cry 2..."
