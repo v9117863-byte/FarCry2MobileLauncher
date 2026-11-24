@@ -127,19 +127,19 @@ class MainActivity : Activity() {
         @JavascriptInterface fun importRuntimeFolder() {
             val tree = prefs.getString("runtime_tree_uri", null)?.let(Uri::parse)
             if (tree == null) {
-                runOnUiThread { evaluate("window.onRuntimeResult&&window.onRuntimeResult(false,'Сначала выбери папку runtime')") }
+                runOnUiThread { evaluate("window.onRuntimeResult&&window.onRuntimeResult(false,'Сначала выбери папку')") }
                 return
             }
             worker.execute {
                 try {
                     val root = DocumentFile.fromTreeUri(this@MainActivity, tree)
-                        ?: throw IllegalStateException("Не удалось открыть папку runtime")
+                        ?: throw IllegalStateException("Не удалось открыть папку")
                     val target = File(filesDir, "runtime")
-                    if (target.exists() && !target.deleteRecursively()) throw IllegalStateException("Не удалось очистить старую папку runtime")
-                    if (!target.mkdirs()) throw IllegalStateException("Не удалось создать папку runtime")
+                    if (target.exists() && !target.deleteRecursively()) throw IllegalStateException("Не удалось очистить старые файлы")
+                    if (!target.mkdirs()) throw IllegalStateException("Не удалось создать папку")
                     copyDocumentContents(root, target)
                     val manifest = File(target, "runtime-manifest.json")
-                    if (!manifest.isFile) throw IllegalStateException("Не найден runtime-manifest.json в корне выбранной папки")
+                    if (!manifest.isFile) throw IllegalStateException("Не найден файл описания модуля в выбранной папке")
                     val json = JSONObject(manifest.readText(Charsets.UTF_8))
                     val required = listOf("entrypoint", "wine", "box86", "box64", "rootfs", "graphicsBackend")
                     val missing = required.filter { key ->
@@ -149,7 +149,7 @@ class MainActivity : Activity() {
                             !candidate.toPath().startsWith(target.canonicalFile.toPath()) || !candidate.exists()
                         }
                     }
-                    if (missing.isNotEmpty()) throw IllegalStateException("Runtime неполный. Отсутствуют компоненты: " + missing.joinToString())
+                    if (missing.isNotEmpty()) throw IllegalStateException("Модуль неполный. Отсутствуют компоненты: " + missing.joinToString())
                     listOf("entrypoint", "wine", "box86", "box64").forEach { key ->
                         val executable = File(target, json.getString(key))
                         if (executable.isFile && !executable.setExecutable(true, false) && !executable.canExecute()) {
@@ -159,14 +159,14 @@ class MainActivity : Activity() {
                     val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
                     val supported = json.optJSONArray("supportedAbis")
                     if (supported != null && (0 until supported.length()).none { supported.optString(it) == abi }) {
-                        throw IllegalStateException("Пакет runtime не поддерживает ABI устройства: " + abi)
+                        throw IllegalStateException("Пакет не поддерживает архитектуру устройства: " + abi)
                     }
                     prefs.edit().putBoolean("runtime_imported", true).putString("runtime_path", target.absolutePath).apply()
-                    runOnUiThread { evaluate("window.onRuntimeResult&&window.onRuntimeResult(true,'Runtime скопирован и проверен: все компоненты найдены')") }
+                    runOnUiThread { evaluate("window.onRuntimeResult&&window.onRuntimeResult(true,'Игровой модуль скопирован и проверен')") }
                 } catch (e: Exception) {
                     File(filesDir, "runtime").deleteRecursively()
                     prefs.edit().putBoolean("runtime_imported", false).remove("runtime_path").apply()
-                    val msg = JSONObject.quote(e.message ?: "Ошибка импорта runtime")
+                    val msg = JSONObject.quote(e.message ?: "Ошибка импорта модуля")
                     runOnUiThread { evaluate("window.onRuntimeResult&&window.onRuntimeResult(false," + msg + ")") }
                 }
             }
@@ -243,21 +243,21 @@ class MainActivity : Activity() {
                 assets.open(RootFSInstaller.FILENAME).use { }
                 assets.open("container_pattern.tzst").use { }
             } catch (e: Exception) {
-                return JSONObject().put("started", false).put("message", "В APK не найдены RootFS или шаблон Wine-контейнера. Нужна полная сборка runtime.").toString()
+                return JSONObject().put("started", false).put("message", "Не найдены системные компоненты игрового модуля. Нужна полная сборка приложения.").toString()
             }
             synchronized(this@MainActivity) {
                 if (launchingGame) return JSONObject().put("started", false).put("preparing", true)
-                    .put("message", "Подготовка Winlator уже выполняется").toString()
+                    .put("message", "Подготовка игры уже выполняется").toString()
                 launchingGame = true
             }
             reportGameProgress(4, "Проверяю игровые файлы и окружение")
             worker.execute {
                 try {
-                    reportGameProgress(10, "Проверяю Wine RootFS")
+                    reportGameProgress(10, "Проверяю системные файлы")
                     val rootFS = RootFS.find(this@MainActivity)
                     val rootDir = rootFS.rootDir
                     if (!rootFS.isValid()) {
-                        reportGameProgress(18, "Распаковываю системные файлы Wine")
+                        reportGameProgress(18, "Подготавливаю системные файлы")
                         if (rootDir.exists() && !rootDir.deleteRecursively()) {
                             throw IllegalStateException("Не удалось очистить повреждённый RootFS")
                         }
@@ -275,7 +275,7 @@ class MainActivity : Activity() {
                         rootFS.createRFSVersionFile(RootFSInstaller.LATEST_VERSION.toInt())
                     }
                     if (!rootFS.isValid()) throw IllegalStateException("RootFS не прошёл проверку после установки")
-                    reportGameProgress(84, "Подготавливаю Wine-контейнер")
+                    reportGameProgress(84, "Настраиваю игровую среду")
                     runOnUiThread {
                         try {
                             val manager = ContainerManager(this@MainActivity)
@@ -284,12 +284,12 @@ class MainActivity : Activity() {
                             if (existing != null) {
                                 completeWinlatorLaunch(manager, existing, gameExe)
                             } else {
-                                reportGameProgress(90, "Создаю игровой контейнер")
+                                reportGameProgress(90, "Создаю игровую сессию")
                                 val config = JSONObject().put("name", "Far Cry 2")
                                 manager.createContainerAsync(config) { created ->
                                     if (created == null) {
                                         launchingGame = false
-                                        reportGameLaunch(false, "Не удалось создать Wine-контейнер. Проверь свободное место.")
+                                        reportGameLaunch(false, "Не удалось создать игровую сессию. Проверь свободное место.")
                                     } else {
                                         completeWinlatorLaunch(manager, created, gameExe)
                                     }
@@ -297,17 +297,17 @@ class MainActivity : Activity() {
                             }
                         } catch (e: Exception) {
                             launchingGame = false
-                            reportGameLaunch(false, "Ошибка подготовки Winlator: " + (e.message ?: "неизвестная ошибка"))
+                            reportGameLaunch(false, "Ошибка подготовки игры: " + (e.message ?: "неизвестная ошибка"))
                         }
                     }
                 } catch (e: Exception) {
                     launchingGame = false
-                    val message = e.message ?: "Не удалось установить RootFS"
+                    val message = e.message ?: "Не удалось подготовить системные файлы"
                     runOnUiThread { reportGameLaunch(false, message) }
                 }
             }
             return JSONObject().put("started", false).put("preparing", true)
-                .put("message", "Устанавливаю системные файлы Wine и подготавливаю контейнер. Первый запуск может занять несколько минут.").toString()
+                .put("message", "Подготавливаю игровые компоненты. Первый запуск может занять несколько минут.").toString()
         }
 
         private fun completeWinlatorLaunch(manager: ContainerManager, container: Container, gameExe: File) {
@@ -331,12 +331,12 @@ class MainActivity : Activity() {
                     putExtra("exec_path", gameExe.absolutePath)
                 }
                 launchingGame = false
-                reportGameProgress(98, "Передаю FarCry2.exe движку Wine/Box64")
-                reportGameLaunch(true, "Контейнер готов. Передаю Far Cry 2 встроенному Wine/Box64.")
+                reportGameProgress(98, "Передаю FarCry2.exe игровой системе")
+                reportGameLaunch(true, "Игровая сессия готова. Запускаю Far Cry 2.")
                 startActivity(intent)
             } catch (e: Exception) {
                 launchingGame = false
-                reportGameLaunch(false, "Не удалось запустить контейнер: " + (e.message ?: "ошибка"))
+                reportGameLaunch(false, "Не удалось открыть игровую сессию: " + (e.message ?: "ошибка"))
             }
         }
 
@@ -379,7 +379,7 @@ class MainActivity : Activity() {
                 gameProcess = null
                 try { inputSocket?.close() } catch (_: Exception) { }
                 inputSocket = null
-                return JSONObject().put("stopped", true).put("message", "Внутренний runtime остановлен").toString()
+                return JSONObject().put("stopped", true).put("message", "Игровая сессия остановлена").toString()
             }
         }
 
@@ -501,7 +501,7 @@ class MainActivity : Activity() {
                 evaluate("window.onGameFolderResult&&window.onGameFolderResult(true,'Папка игры выбрана')")
             } else {
                 prefs.edit().putString("runtime_tree_uri", uri.toString()).putBoolean("runtime_imported", false).apply()
-                evaluate("window.onRuntimeResult&&window.onRuntimeResult(true,'Папка runtime выбрана. Нажми IMPORT RUNTIME')")
+                evaluate("window.onRuntimeResult&&window.onRuntimeResult(true,'Папка выбрана. Нажми ИМПОРТ')")
             }
         }
     }
