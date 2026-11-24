@@ -250,11 +250,14 @@ class MainActivity : Activity() {
                     .put("message", "Подготовка Winlator уже выполняется").toString()
                 launchingGame = true
             }
+            reportGameProgress(4, "Проверяю игровые файлы и окружение")
             worker.execute {
                 try {
+                    reportGameProgress(10, "Проверяю Wine RootFS")
                     val rootFS = RootFS.find(this@MainActivity)
                     val rootDir = rootFS.rootDir
                     if (!rootFS.isValid()) {
+                        reportGameProgress(18, "Распаковываю системные файлы Wine")
                         if (rootDir.exists() && !rootDir.deleteRecursively()) {
                             throw IllegalStateException("Не удалось очистить повреждённый RootFS")
                         }
@@ -268,9 +271,11 @@ class MainActivity : Activity() {
                             rootDir
                         )
                         if (!extracted) throw IllegalStateException("Не удалось распаковать RootFS. Проверь свободное место.")
+                        reportGameProgress(76, "Проверяю установленную систему")
                         rootFS.createRFSVersionFile(RootFSInstaller.LATEST_VERSION.toInt())
                     }
                     if (!rootFS.isValid()) throw IllegalStateException("RootFS не прошёл проверку после установки")
+                    reportGameProgress(84, "Подготавливаю Wine-контейнер")
                     runOnUiThread {
                         try {
                             val manager = ContainerManager(this@MainActivity)
@@ -279,6 +284,7 @@ class MainActivity : Activity() {
                             if (existing != null) {
                                 completeWinlatorLaunch(manager, existing, gameExe)
                             } else {
+                                reportGameProgress(90, "Создаю игровой контейнер")
                                 val config = JSONObject().put("name", "Far Cry 2")
                                 manager.createContainerAsync(config) { created ->
                                     if (created == null) {
@@ -325,7 +331,8 @@ class MainActivity : Activity() {
                     putExtra("exec_path", gameExe.absolutePath)
                 }
                 launchingGame = false
-                reportGameLaunch(true, "Контейнер готов. Запускаю Far Cry 2 через встроенный Wine/Box64.")
+                reportGameProgress(98, "Передаю FarCry2.exe движку Wine/Box64")
+                reportGameLaunch(true, "Контейнер готов. Передаю Far Cry 2 встроенному Wine/Box64.")
                 startActivity(intent)
             } catch (e: Exception) {
                 launchingGame = false
@@ -353,8 +360,16 @@ class MainActivity : Activity() {
             }
         }
 
+        private fun reportGameProgress(percent: Int, message: String) {
+            runOnUiThread {
+                evaluate("window.onGameLaunchProgress&&window.onGameLaunchProgress(" + percent.coerceIn(0, 100) + "," + JSONObject.quote(message) + ")")
+            }
+        }
+
         private fun reportGameLaunch(ok: Boolean, message: String) {
-            evaluate("window.onGameLaunchResult&&window.onGameLaunchResult(" + ok + "," + JSONObject.quote(message) + ")")
+            runOnUiThread {
+                evaluate("window.onGameLaunchResult&&window.onGameLaunchResult(" + ok + "," + JSONObject.quote(message) + ")")
+            }
         }
 
         @JavascriptInterface fun stopGame(): String {
