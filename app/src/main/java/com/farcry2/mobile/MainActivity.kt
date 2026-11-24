@@ -44,7 +44,22 @@ class MainActivity : Activity() {
             settings.allowFileAccess = true
             settings.allowContentAccess = true
             settings.mediaPlaybackRequiresUserGesture = false
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    val mapFile = File(filesDir, "world-map.jpg")
+                    if (mapFile.isFile && mapFile.length() <= 12L * 1024 * 1024) {
+                        try {
+                            val encoded = android.util.Base64.encodeToString(mapFile.readBytes(), android.util.Base64.NO_WRAP)
+                            val mime = prefs.getString("world_map_mime", "image/jpeg") ?: "image/jpeg"
+                            view?.evaluateJavascript(
+                                "window.onWorldMapResult&&window.onWorldMapResult(true," + JSONObject.quote(encoded) + ",\\"Сохранённая карта загружена\\"," + JSONObject.quote(mime) + ")",
+                                null
+                            )
+                        } catch (_: Exception) { }
+                    }
+                }
+            }
             webChromeClient = WebChromeClient()
             addJavascriptInterface(AndroidBridge(), "AndroidDevice")
         }
@@ -382,8 +397,10 @@ class MainActivity : Activity() {
                 if (bytes.size > 12 * 1024 * 1024) throw IllegalStateException("Файл карты слишком большой (максимум 12 МБ)")
                 val target = File(filesDir, "world-map.jpg")
                 target.writeBytes(bytes)
+                val mime = contentResolver.getType(uri)?.takeIf { it.startsWith("image/") } ?: "image/jpeg"
+                prefs.edit().putString("world_map_mime", mime).apply()
                 val encoded = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
-                evaluate("window.onWorldMapResult&&window.onWorldMapResult(true," + JSONObject.quote(encoded) + ",\"Карта загружена в приложение\")")
+                evaluate("window.onWorldMapResult&&window.onWorldMapResult(true," + JSONObject.quote(encoded) + ",\"Карта загружена в приложение\"," + JSONObject.quote(mime) + ")")
             } catch (e: Exception) {
                 evaluate("window.onWorldMapResult&&window.onWorldMapResult(false,\"\"," + JSONObject.quote(e.message ?: "Ошибка загрузки карты") + ")")
             }
