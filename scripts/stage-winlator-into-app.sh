@@ -19,7 +19,7 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 old = '    public static final String XSERVER_PATH = "/tmp/.X11-unix/X0";'
-new = old + '\\n    public static final String XSERVER_DISPLAY = ":0";'
+new = old + '\n    public static final String XSERVER_DISPLAY = ":0";'
 if "XSERVER_DISPLAY" not in s:
     if old not in s: raise SystemExit("UnixSocketConfig XSERVER_PATH declaration missing")
     s = s.replace(old, new, 1)
