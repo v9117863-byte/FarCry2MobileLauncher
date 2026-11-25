@@ -87,11 +87,19 @@ started_old = """            pid = pidField.getInt(process);
 
             createDebugThread(process.getInputStream());
             createDebugThread(process.getErrorStream());"""
-started_new = """            pid = pidField.getInt(process);
-            pidField.setAccessible(false);
-            appendDiagnosticLine("Process started; pid=" + pid);
+started_new = """            appendDiagnosticLine("PROCESS STARTED: ProcessBuilder returned a process object");
             createDebugThread(process.getInputStream());
-            createDebugThread(process.getErrorStream());"""
+            createDebugThread(process.getErrorStream());
+            try {
+                pid = pidField.getInt(process);
+                appendDiagnosticLine("PROCESS PID=" + pid);
+            }
+            catch (Exception pidError) {
+                appendDiagnosticLine("PID LOOKUP FAILED (process may still be running): " + pidError.getClass().getName() + ": " + String.valueOf(pidError.getMessage()));
+            }
+            finally {
+                try { pidField.setAccessible(false); } catch (Exception ignored) {}
+            }"""
 if started_old not in s: raise SystemExit("ProcessHelper process-start marker not found")
 s = s.replace(started_old, started_new, 1)
 import re
