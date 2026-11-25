@@ -376,7 +376,11 @@ while IFS= read -r -d '' file; do
   rel="${file#"$UPSTREAM/app/src/main/assets/"}"
   [[ "$rel" == "index.html" ]] && continue
   mkdir -p "$APP/assets/$(dirname "$rel")"
-  if [[ -e "$APP/assets/$rel" ]]; then echo "Asset collision: $rel" >&2; exit 2; fi
+  # Keep launcher-owned files when an upstream asset uses the same relative path.
+  if [[ -e "$APP/assets/$rel" ]]; then
+    echo "Keeping launcher asset on collision: $rel"
+    continue
+  fi
   cp "$file" "$APP/assets/$rel"
 done < <(find "$UPSTREAM/app/src/main/assets" -type f -print0)
 echo "Java: $(find "$APP/java/com/winlator" -type f -name '*.java' | wc -l)"
