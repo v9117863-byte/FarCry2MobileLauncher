@@ -467,6 +467,9 @@ from pathlib import Path
 import sys
 p = Path(sys.argv[1])
 s = p.read_text()
+for header in ("#include <errno.h>", "#include <stddef.h>"):
+    if header not in s:
+        s = s.replace("#include <stdbool.h>", "#include <stdbool.h>\\n" + header, 1)
 old = """    int serverFd;
     int shutdownFd;"""
 new = """    int serverFd;
