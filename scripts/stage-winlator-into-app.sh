@@ -13,6 +13,7 @@ cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
 # Persist subprocess output directly; upstream LogView only writes when its UI stream is usable.
 python3 - "$APP/java/com/winlator/core/ProcessHelper.java" <<'PY'
 from pathlib import Path
+import re
 import sys
 p = Path(sys.argv[1])
 s = p.read_text()
@@ -107,7 +108,6 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
         return pid;
     }"""
 pattern = re.compile(r'public static int exec\(String command, EnvVars envVars, File workingDir, Callback<Integer> terminationCallback\) \{.*?\n    \}', re.S)
-s = Path(sys.argv[1]).read_text()
 if not pattern.search(s):
     raise SystemExit("ProcessHelper exec method not found")
 s = pattern.sub(lambda m: exec_method, s, count=1)
