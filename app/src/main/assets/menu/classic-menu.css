@@ -1,31 +1,32 @@
-/* Classic GTA-LC-inspired menu, with original Far Cry 2 artwork. */
-html,body{width:100%;height:100%;min-height:100%;margin:0;background:#000!important;color:#fff;overflow:hidden}
+/* Far Cry 2: dusty, sun-bleached field-command menu */
+:root{--fc2-ochre:#c99a43;--fc2-sand:#d6c39a;--fc2-olive:#353b2b;--fc2-rust:#743c2c;--fc2-ink:#10120e}
+html,body{width:100%;height:100%;min-height:100%;margin:0;background:#080a07!important;color:#e8dfc8;overflow:hidden}
 .topbar,.hero,.sectionnav.de-menu{display:none!important}
-.main{position:relative;width:100%;height:100dvh;max-width:none;margin:0;padding:0!important;overflow:hidden;background:#000}
+#main.main{position:relative;width:100%;height:100dvh;max-width:none;margin:0;padding:0!important;overflow:hidden;background:#080a07}
 .page{position:absolute;inset:0;min-height:0;overflow:auto;padding:0}
-#home{overflow:hidden;background:#000}
-.classic-scene{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(100vw,177.7778vh);height:min(56.25vw,100vh);aspect-ratio:16/9;overflow:hidden;background:#19191d url("scene-classic-menu.svg") center/cover no-repeat;box-shadow:0 0 0 1px #171717}
-.classic-scene:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#07070ab8,#12101877 45%,#08080a8a),linear-gradient(0deg,#05050755,transparent 38%);pointer-events:none}
-.classic-brand{position:absolute;z-index:2;left:4.5%;top:7%;font-family:Impact,"Arial Black",sans-serif;font-size:clamp(17px,4.2vw,34px);font-weight:1000;letter-spacing:.02em;color:#fff;text-shadow:3px 3px 0 #050505,-1px -1px #111,-2px 2px #111}
-.classic-title{position:absolute;z-index:2;right:1.5%;top:2.3%;font-family:Impact,"Arial Black",sans-serif;font-size:clamp(22px,5.1vw,42px);font-weight:1000;letter-spacing:.015em;text-transform:lowercase;color:#e6a42f;text-shadow:2px 3px 0 #5a3516,0 0 10px #f5b33b55}
-.classic-panel{position:absolute;left:3.2%;right:4.7%;top:10%;bottom:8.5%;background:linear-gradient(110deg,#686578d9,#777487d9 54%,#625f70d9);border:1px solid #aaa5b45c;box-shadow:0 8px 25px #0006}
-.classic-panel:before{content:"";position:absolute;inset:0;border:1px solid #ffffff20;pointer-events:none}
-.classic-options{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;width:min(60%,320px)}
-.classic-option{position:relative;width:auto;min-width:118px;padding:3px 13px;border:0;background:transparent;color:#ffbd45;font-family:Impact,"Arial Black",sans-serif;font-size:clamp(12px,2.4vw,21px);font-weight:1000;line-height:1.15;text-transform:lowercase;text-shadow:2px 2px 0 #3d2917;letter-spacing:.01em}
-.classic-option.selected,.classic-option:focus-visible{background:#d6a12d55;color:#ffd16b;outline:0}
-.classic-option:active{transform:scale(.97)}
-.classic-bottom{position:absolute;z-index:3;left:4.5%;right:4.7%;bottom:3.3%;height:8.5%;background:#ffb52e;box-shadow:0 3px 0 #7b531a,inset 0 2px #ffdc76}
-.classic-version{position:absolute;z-index:4;left:1%;bottom:1.1%;font:italic 700 clamp(4px,.65vw,7px)/1.1 system-ui,sans-serif;color:#e7d9e5;text-shadow:1px 1px #000}
-.classic-install{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,680px);max-height:90dvh;overflow:auto;display:none;z-index:10}
-.classic-install .card{background:#17151bef;border:1px solid #9b793f;border-radius:2px}
-#settings,#video,#performance,#packs,#touch,#about,#worldmap,#manual{background:linear-gradient(135deg,#17151b,#08090b);padding:16px 14px 24px;box-sizing:border-box}
-#settings .card,#video .card,#performance .card,#packs .card,#touch .card,#about .card,#worldmap .card,#manual .card{max-width:760px;margin:0 auto 12px;background:linear-gradient(135deg,#24222bef,#111116f5);border:1px solid #8a6938;border-radius:2px}
-#settings .de-section-kicker,#video .de-section-kicker,#performance .de-section-kicker{max-width:760px;margin:0 auto;color:#e6a42f}
+#home{overflow:hidden;background:#080a07}
+.classic-scene{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(100vw,177.7778vh);height:min(56.25vw,100vh);aspect-ratio:16/9;overflow:hidden;background:#33372b url("scene-classic-menu.svg") center/cover no-repeat;box-shadow:0 0 0 1px #1b1d17}
+.classic-scene:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#10140edb 0%,#20251b77 46%,#0c100bd1 100%),linear-gradient(0deg,#080a07a8,transparent 38%);pointer-events:none;z-index:1}
+.classic-brand{position:absolute;z-index:3;left:4.5%;top:5.5%;font-family:Impact,"Arial Narrow",sans-serif;font-size:clamp(20px,4.6vw,40px);font-weight:900;letter-spacing:.12em;color:#e0d2ad;text-shadow:2px 3px #11150d,0 0 14px #000}
+.classic-title{position:absolute;z-index:3;right:4.8%;top:6%;font-family:Impact,"Arial Narrow",sans-serif;font-size:clamp(15px,2.7vw,24px);font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#d0a14c;text-shadow:2px 2px #17170f}
+.classic-panel{position:absolute;z-index:2;left:4%;right:4%;top:17%;bottom:13%;background:linear-gradient(115deg,#252a20e8,#303326dc 55%,#1a2119e8);border:1px solid #b99a5b88;box-shadow:0 12px 32px #0009,inset 0 0 0 5px #11150d66}
+.classic-panel:before{content:"";position:absolute;inset:8px;border:1px solid #d6c49a33;pointer-events:none}
+.classic-panel:after{content:"FIELD OPERATIONS  /  AFRICA";position:absolute;left:3%;bottom:4%;font:700 clamp(6px,.8vw,9px)/1.2 monospace;letter-spacing:.22em;color:#c6b58e88}
+.classic-options{position:absolute;z-index:4;left:50%;top:47%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:stretch;gap:clamp(4px,.7vw,9px);width:min(48%,330px)}
+.classic-option{position:relative;min-height:clamp(28px,5vw,46px);padding:5px 15px;border:1px solid transparent;border-left:3px solid #8c713f;background:linear-gradient(90deg,#171c15cc,#20251bcc);color:#d9cba8;text-align:left;font-family:Impact,"Arial Narrow",sans-serif;font-size:clamp(13px,2.4vw,21px);font-weight:800;line-height:1.1;letter-spacing:.15em;text-transform:uppercase;text-shadow:1px 2px #090b08;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}
+.classic-option:before{content:"";display:inline-block;width:7px;height:7px;margin:0 12px 2px 1px;transform:rotate(45deg);background:#8e7547}
+.classic-option.selected,.classic-option:focus-visible,.classic-option:active{outline:0;border-color:#c3a66b88;border-left-color:#d5a64e;background:linear-gradient(90deg,#66502cdd,#373b29e8);color:#fff0c8}
+.classic-option:active{transform:translateX(2px)}
+.classic-bottom{position:absolute;z-index:3;left:4%;right:4%;bottom:5%;height:5px;background:#9b7138;box-shadow:0 1px 0 #d1b77c,inset 0 1px #e0c58a}
+.classic-version{position:absolute;z-index:4;left:4.5%;bottom:2.2%;font:700 clamp(5px,.7vw,8px)/1.1 monospace;letter-spacing:.12em;color:#c7b891;text-shadow:1px 1px #000}
+.classic-install{position:absolute;z-index:10;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92vw,680px);max-height:90dvh;overflow:auto;display:none}
+.classic-install .card{background:#171b14f2;border:1px solid #9a7948;border-radius:2px}
+#settings,#video,#performance,#packs,#touch,#about,#worldmap,#manual{background:linear-gradient(145deg,#1b2118,#090c08);padding:16px 14px 24px;box-sizing:border-box;color:#e2d7bb}
+#settings .card,#video .card,#performance .card,#packs .card,#touch .card,#about .card,#worldmap .card,#manual .card{max-width:760px;margin:0 auto 12px;background:linear-gradient(135deg,#282d21f2,#131810f5);border:1px solid #806b45;border-radius:2px}
+#settings .de-section-kicker,#video .de-section-kicker,#performance .de-section-kicker{max-width:760px;margin:0 auto;color:#c9a15c}
 .settings-cats{grid-template-columns:repeat(2,minmax(0,1fr))}
-.settings-open{border-radius:2px;background:linear-gradient(100deg,#393640,#1b1a20);border-color:#756044}
-.settings-open b{color:#f2d6a3}
-.settings-back{max-width:760px;margin:0 auto 12px;display:block}
-@media(orientation:portrait){.classic-scene{width:100vw;height:auto;aspect-ratio:16/9}.classic-brand{font-size:clamp(15px,4.6vw,28px)}.classic-title{font-size:clamp(19px,5.8vw,35px)}.classic-option{font-size:clamp(12px,3.2vw,19px)}.classic-panel{top:10%;bottom:8.5%}.settings-cats{grid-template-columns:1fr}}
+.settings-open{border-radius:2px;background:linear-gradient(100deg,#353b2b,#1b2118);border-color:#766342}
+.settings-open b{color:#e1d1a9}
+.settings-back{max-width:760px;margin:0 auto 12px;display:block;color:#e4d3ad;background:#343b2c;border:1px solid #8b7148;border-radius:2px}
+@media(orientation:portrait){.classic-scene{width:100vw;height:auto;aspect-ratio:16/9}.classic-brand{font-size:clamp(18px,5vw,30px)}.classic-title{font-size:clamp(12px,3vw,19px)}.classic-options{width:min(64%,300px)}.classic-option{font-size:clamp(11px,3.1vw,18px);min-height:clamp(24px,6vw,36px)}.classic-panel{top:17%;bottom:13%}.settings-cats{grid-template-columns:1fr}}
 @media(max-height:420px){#settings,#video,#performance,#packs,#touch,#about,#worldmap,#manual{padding-top:7px}.settings-open{min-height:48px}}
-
-.classic-option{user-select:none;-webkit-tap-highlight-color:transparent;cursor:pointer}
