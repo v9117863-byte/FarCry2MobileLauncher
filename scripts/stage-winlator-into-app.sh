@@ -97,7 +97,24 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
                 }
                 else appendDiagnosticLine("EXECUTABLE MISSING: " + executable.getAbsolutePath());
             }
-            ProcessBuilder processBuilder = new ProcessBuilder(commandArgs).directory(workingDir);
+            // Android 10+ blocks execve() of binaries stored in the writable app data
+            // directory for apps targeting API 29+. Execute the system linker instead;
+            // linker64 then loads Box64 from its private RootFS path without execve() on it.
+            String[] processArgs = commandArgs;
+            if (android.os.Build.VERSION.SDK_INT >= 29 && commandArgs.length > 0
+                    && commandArgs[0].startsWith("/data/")) {
+                File systemLinker = new File("/system/bin/linker64");
+                if (systemLinker.isFile()) {
+                    processArgs = new String[commandArgs.length + 1];
+                    processArgs[0] = systemLinker.getAbsolutePath();
+                    processArgs[1] = commandArgs[0];
+                    System.arraycopy(commandArgs, 1, processArgs, 2, commandArgs.length - 1);
+                    appendDiagnosticLine("ANDROID_WX_WORKAROUND: exec via " + systemLinker + " target=" + commandArgs[0]);
+                } else {
+                    appendDiagnosticLine("ANDROID_WX_WORKAROUND UNAVAILABLE: /system/bin/linker64 missing");
+                }
+            }
+            ProcessBuilder processBuilder = new ProcessBuilder(processArgs).directory(workingDir);
             appendDiagnosticLine("PROCESS BUILDER READY");
             if (envVars != null) {
                 Map<String, String> environment = processBuilder.environment();
