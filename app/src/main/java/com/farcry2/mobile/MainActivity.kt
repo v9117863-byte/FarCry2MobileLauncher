@@ -541,7 +541,16 @@ class MainActivity : Activity() {
                     )
                     if (forcedDx9Profile != oldProfile) fc2Profile.writeText(forcedDx9Profile)
                 }
-                appendLaunchLog("FC2_PROFILE path=" + fc2Profile.absolutePath + " platform=d3d9 size=" + profileWidth + "x" + profileHeight)
+                // Some Wine prefixes expose the game profile directly under the user home.
+                // Keep a second copy there as well; the Windows Documents location remains primary.
+                val alternateProfile = File(container.getUserDir(), "My Games/Far Cry 2/GamerProfile.xml")
+                if (!alternateProfile.isFile) {
+                    val alternateDir = alternateProfile.parentFile
+                    if (alternateDir != null && (alternateDir.isDirectory || alternateDir.mkdirs())) {
+                        fc2Profile.copyTo(alternateProfile, overwrite = false)
+                    }
+                }
+                appendLaunchLog("FC2_PROFILE path=" + fc2Profile.absolutePath + " alternate=" + alternateProfile.absolutePath + " platform=d3d9 size=" + profileWidth + "x" + profileHeight)
                 // Apply the graphics choice from the launcher. Previously the UI saved
                 // this preference but the Winlator container kept its default Vortek
                 // Vulkan driver, so the visible "Turnip" selection had no effect.
