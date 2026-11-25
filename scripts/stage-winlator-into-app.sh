@@ -105,28 +105,6 @@ exec_new = """    public static int exec(String command, EnvVars envVars, File w
             return pid;"""
 if exec_old not in s: raise SystemExit("ProcessHelper exec start marker not found")
 s = s.replace(exec_old, exec_new, 1)
-started_old = """            Field pidField = process.getClass().getDeclaredField("pid");
-            pidField.setAccessible(true);
-            pid = pidField.getInt(process);
-            pidField.setAccessible(false);
-
-            createDebugThread(process.getInputStream());
-            createDebugThread(process.getErrorStream());"""
-started_new = """            appendDiagnosticLine("PROCESS STARTED: ProcessBuilder returned a process object");
-            createDebugThread(process.getInputStream());
-            createDebugThread(process.getErrorStream());
-            try {
-                Field pidField = process.getClass().getDeclaredField("pid");
-                pidField.setAccessible(true);
-                pid = pidField.getInt(process);
-                appendDiagnosticLine("PROCESS PID=" + pid);
-                try { pidField.setAccessible(false); } catch (Exception ignored) {}
-            }
-            catch (Exception pidError) {
-                appendDiagnosticLine("PID LOOKUP FAILED (process may still be running): " + pidError.getClass().getName() + ": " + String.valueOf(pidError.getMessage()));
-            }"""
-if started_old not in s: raise SystemExit("ProcessHelper process-start marker not found")
-s = s.replace(started_old, started_new, 1)
 import re
 pattern = r'        }\s*catch \(Exception e\) \{\}\s*return pid;\s*}'
 match = re.search(pattern, s)
