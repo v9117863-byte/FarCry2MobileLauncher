@@ -216,5 +216,6 @@ const aimStrength=$('aimAssistStrength');
 if(aimStrength) aimStrength.addEventListener('input',()=>{applyControlOptions();save()});
 restore();loadDevice();markFocus();refreshInstallStatus();applyControlOptions();
 function openGameInstall(){switchTab('home');$('classicInstall').style.display='block';}
-function closeGameInstall(){$('classicInstall').style.display='none';}\nfunction quitLauncher(){try{if(window.AndroidDevice&&AndroidDevice.quitApp){AndroidDevice.quitApp();return;}}catch(e){}toast('Чтобы закрыть лаунчер, используй кнопку «Назад» Android.');}
+function closeGameInstall(){$('classicInstall').style.display='none';}
+function quitLauncher(){try{if(window.AndroidDevice&&AndroidDevice.quitApp){AndroidDevice.quitApp();return;}}catch(e){}toast('Чтобы закрыть лаунчер, используй кнопку «Назад» Android.');}
 </script></body></html>
