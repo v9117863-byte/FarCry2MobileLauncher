@@ -567,6 +567,119 @@ new = """            if (events[i].data.ptr == &connector->serverFd ||
             else if (events[i].data.ptr != &connector->shutdownFd &&"""
 if old not in s: raise SystemExit("XConnectorEpoll accept dispatch block missing")
 s = s.replace(old, new, 1)
+# Preserve the exact native failure stage and errno. The Java wrapper otherwise
+# collapses every socket/epoll failure into "Failed to allocate XConnectorEpoll".
+for header in ("#include <errno.h>", "#include <stdio.h>"):
+    if header not in s:
+        s = s.replace("#include <stdbool.h>", "#include <stdbool.h>\n" + header, 1)
+
+allocate_old = """static XConnectorEpoll* XConnectorEpoll_allocate(JNIEnv* env, jobject obj, const char* sockPath) {
+    XConnectorEpoll* connector = calloc(1, sizeof(XConnectorEpoll));
+    connector->abstractServerFd = -1;
+
+    connector->epollFd = epoll_create(MAX_EVENTS);
+    if (connector->epollFd < 0) goto error;
+
+    connector->serverFd = createServerSocket(sockPath);
+    if (connector->serverFd < 0) goto error;
+
+    connector->abstractServerFd = createAbstractX11Socket(sockPath);
+    if (connector->abstractServerFd < 0) goto error;
+    if (!addFdToEpoll(connector->epollFd, connector->serverFd, &connector->serverFd)) goto error;
+
+    if (!addFdToEpoll(connector->epollFd, connector->abstractServerFd, &connector->abstractServerFd)) {
+        __android_log_print(ANDROID_LOG_ERROR, "FarCry2X11",
+            "Failed to register abstract X11 socket in epoll: %s", strerror(errno));
+        goto error;
+    }
+
+    connector->shutdownFd = eventfd(0, EFD_NONBLOCK);
+    if (connector->shutdownFd < 0) goto error;
+
+    if (!addFdToEpoll(connector->epollFd, connector->shutdownFd, &connector->shutdownFd)) goto error;
+
+    (*env)->GetJavaVM(env, &connector->jmethods.jvm);
+    connector->jmethods.obj = (*env)->NewGlobalRef(env, obj);
+    return connector;
+
+error:
+    XConnectorEpoll_destroy(env, connector);
+    return NULL;
+}"""
+allocate_new = """static XConnectorEpoll* XConnectorEpoll_allocate(JNIEnv* env, jobject obj, const char* sockPath,
+        const char** failureStage, int* failureErrno) {
+    XConnectorEpoll* connector = calloc(1, sizeof(XConnectorEpoll));
+    if (!connector) {
+        *failureStage = "calloc connector";
+        *failureErrno = ENOMEM;
+        return NULL;
+    }
+    connector->epollFd = -1;
+    connector->serverFd = -1;
+    connector->abstractServerFd = -1;
+    connector->shutdownFd = -1;
+
+    connector->epollFd = epoll_create(MAX_EVENTS);
+    if (connector->epollFd < 0) { *failureStage = "epoll_create"; goto error; }
+
+    connector->serverFd = createServerSocket(sockPath);
+    if (connector->serverFd < 0) { *failureStage = "filesystem X11 socket bind/listen"; goto error; }
+
+    if (!addFdToEpoll(connector->epollFd, connector->serverFd, &connector->serverFd)) {
+        *failureStage = "register filesystem X11 socket in epoll"; goto error;
+    }
+
+    connector->abstractServerFd = createAbstractX11Socket(sockPath);
+    if (connector->abstractServerFd < 0) { *failureStage = "abstract X11 socket bind/listen"; goto error; }
+
+    if (!addFdToEpoll(connector->epollFd, connector->abstractServerFd, &connector->abstractServerFd)) {
+        *failureStage = "register abstract X11 socket in epoll"; goto error;
+    }
+
+    connector->shutdownFd = eventfd(0, EFD_NONBLOCK);
+    if (connector->shutdownFd < 0) { *failureStage = "eventfd"; goto error; }
+
+    if (!addFdToEpoll(connector->epollFd, connector->shutdownFd, &connector->shutdownFd)) {
+        *failureStage = "register shutdown eventfd in epoll"; goto error;
+    }
+
+    (*env)->GetJavaVM(env, &connector->jmethods.jvm);
+    connector->jmethods.obj = (*env)->NewGlobalRef(env, obj);
+    return connector;
+
+error:
+    *failureErrno = errno;
+    XConnectorEpoll_destroy(env, connector);
+    return NULL;
+}"""
+if allocate_old not in s:
+    raise SystemExit("Exact XConnectorEpoll_allocate implementation not found; refusing blind patch")
+s = s.replace(allocate_old, allocate_new, 1)
+
+jni_old = """    const char* pathPtr = (*env)->GetStringUTFChars(env, sockPath, 0);
+    XConnectorEpoll* connector = XConnectorEpoll_allocate(env, obj, pathPtr);
+
+    (*env)->ReleaseStringUTFChars(env, sockPath, pathPtr);
+    return (jlong)connector;"""
+jni_new = """    const char* pathPtr = (*env)->GetStringUTFChars(env, sockPath, 0);
+    const char* failureStage = "unknown native allocation stage";
+    int failureErrno = 0;
+    XConnectorEpoll* connector = XConnectorEpoll_allocate(env, obj, pathPtr, &failureStage, &failureErrno);
+
+    (*env)->ReleaseStringUTFChars(env, sockPath, pathPtr);
+    if (!connector) {
+        char message[256];
+        snprintf(message, sizeof(message), "XConnectorEpoll allocation failed at %s (errno=%d: %s)",
+            failureStage, failureErrno, strerror(failureErrno));
+        __android_log_print(ANDROID_LOG_ERROR, "FarCry2X11", "%s", message);
+        jclass exceptionClass = (*env)->FindClass(env, "java/lang/RuntimeException");
+        if (exceptionClass) (*env)->ThrowNew(env, exceptionClass, message);
+        return 0;
+    }
+    return (jlong)connector;"""
+if !s.includes(jni_old) throw new Error("nativeAllocate wrapper marker not found");
+s = s.replace(jni_old, jni_new, 1);
+
 p.write_text(s)
 PY
 if [[ -d "$UPSTREAM/app/src/main/jniLibs" ]]; then
