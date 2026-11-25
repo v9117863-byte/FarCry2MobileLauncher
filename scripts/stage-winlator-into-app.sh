@@ -247,7 +247,16 @@ new_cb = """guestProgramLauncherComponent.setTerminationCallback((status) -> {
             runOnUiThread(() -> {
             new AlertDialog.Builder(this)
                 .setTitle("Far Cry 2 не запустилась")
-                .setMessage("Игровой процесс завершился с кодом " + status + ". Экран Winlator оставлен открытым, чтобы не возвращать тебя молча в лаунчер. Проверь EXE и настройки контейнера.")
+                .setMessage("Игровой процесс завершился с кодом " + status + ". Экран Winlator оставлен открытым, чтобы не возвращать тебя молча в лаунчер.")
+                .setNeutralButton("Скопировать журнал", (dialog, which) -> {
+                    try {
+                        android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Far Cry 2 error log", com.winlator.core.ProcessHelper.readDiagnosticLogTail()));
+                        Toast.makeText(this, "Журнал скопирован", Toast.LENGTH_LONG).show();
+                    } catch (Throwable copyError) {
+                        Toast.makeText(this, "Ошибка копирования: " + copyError.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                })
                 .setPositiveButton("Вернуться в лаунчер", (dialog, which) -> finish())
                 .setNegativeButton("Остаться здесь", null)
                 .setCancelable(false)
@@ -320,7 +329,16 @@ startup_new = """        final java.util.concurrent.atomic.AtomicReference<Strin
                     String detail = "Этап: " + startupStage.get() + "\\n" + error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage());
                     new AlertDialog.Builder(this)
                         .setTitle("Ошибка запуска Winlator")
-                        .setMessage("Сбой произошёл до запуска FarCry2.exe.\\n\\n"+detail+"\\n\\nПодробности сохранены в системном журнале Android.")
+                        .setMessage("Сбой произошёл до запуска FarCry2.exe.\\n\\n"+detail)
+                        .setNeutralButton("Скопировать журнал", (dialog, which) -> {
+                            try {
+                                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Far Cry 2 startup error log", com.winlator.core.ProcessHelper.readDiagnosticLogTail()));
+                                Toast.makeText(this, "Журнал скопирован", Toast.LENGTH_LONG).show();
+                            } catch (Throwable copyError) {
+                                Toast.makeText(this, "Ошибка копирования: " + copyError.getMessage(), Toast.LENGTH_LONG).show();
+                            }
+                        })
                         .setPositiveButton("Вернуться в лаунчер", (dialog, which) -> finish())
                         .setNegativeButton("Остаться на экране", null)
                         .setCancelable(false)
