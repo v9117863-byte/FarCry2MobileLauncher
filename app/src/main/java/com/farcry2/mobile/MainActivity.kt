@@ -502,18 +502,21 @@ class MainActivity : Activity() {
 
         private fun completeWinlatorLaunch(manager: ContainerManager, container: Container, gameExe: File) {
             try {
-                val gameDir = gameExe.parentFile?.canonicalFile
-                    ?: throw IllegalStateException("Не удалось определить папку игры")
-                // Rebuild drive mappings without stale F: entries, then point F: at this exact imported game folder.
+                // Map F: to the imported game's ROOT, not merely the directory containing
+                // FarCry2.exe. This keeps nested installations addressable as F:\\subfolder\\FarCry2.exe.
+                val gameRoot = File(filesDir, "game").canonicalFile
+                if (!gameExe.toPath().startsWith(gameRoot.toPath())) {
+                    throw IllegalStateException("FarCry2.exe находится вне импортированной папки игры")
+                }
+                // Rebuild mappings without stale/duplicate F: entries. Winlator's drive
+                // parser uses the slash before the next drive letter as a separator.
                 val driveMap = StringBuilder()
                 container.drivesIterator().forEach { drive ->
                     if (!drive.letter.equals("F", ignoreCase = true)) {
-                        // The upstream drive parser uses the character before the next drive letter as a separator.
-                        // Restore the trailing slash removed by drivesIterator() so existing mappings stay intact.
                         driveMap.append(drive.letter).append(':').append(drive.path).append('/')
                     }
                 }
-                driveMap.append("F:").append(gameDir.absolutePath)
+                driveMap.append("F:").append(gameRoot.absolutePath)
                 container.setDrives(driveMap.toString())
                 container.setScreenSize(resolveRequestedScreenSize())
                 // Far Cry 2 reads its renderer from GamerProfile.xml; seed DX9 before its first run.
@@ -580,14 +583,7 @@ class MainActivity : Activity() {
                 // is not provided), as confirmed by the device log.
                 container.setDXWrapper(com.winlator.container.DXWrappers.DXVK)
                 container.setDXWrapperConfig("")
-                // The imported game lives in app-private storage, which is not one of
-                // Winlator's default D:/E: drives. Register it before XServerDisplayActivity
-                // creates dosdevices symlinks and converts exec_path to a DOS path.
-                val gameDrivePath = File(filesDir, "game").canonicalPath
-                val gameDriveAlreadyMapped = container.drivesIterator().any { it.path == gameDrivePath }
-                if (!gameDriveAlreadyMapped) {
-                    container.setDrives(container.drives + "F:" + gameDrivePath)
-                }
+                // F: was normalized above; do not append another mapping here.
                 val gameEnv = com.winlator.core.EnvVars(container.getEnvVars())
                 gameEnv.put("WINEESYNC", "0")
                 gameEnv.put("WINEFSYNC", "0")
