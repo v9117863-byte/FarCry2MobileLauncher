@@ -422,6 +422,50 @@ if old not in s: raise SystemExit("XServerComponent.start marker missing")
 xserver.write_text(s.replace(old, new, 1))
 guest = Path(sys.argv[2])
 s = guest.read_text()
+# Do not launch Wine until the per-process abstract X11 socket is accepting clients.
+# Xlib inside Wine resolves :N to @/tmp/.X11-unix/XN on Android; a filesystem
+# socket under RootFS alone is invisible to the non-chrooted Wine process.
+imports = """import android.net.LocalSocket;
+import android.net.LocalSocketAddress;
+import android.os.SystemClock;
+"""
+if "import android.net.LocalSocket;" not in s:
+    s = s.replace("import android.content.Context;", imports + "import android.content.Context;", 1)
+await_method = """    private void awaitXServerSocket() {
+        String socketName = UnixSocketConfig.XSERVER_PATH;
+        long deadline = SystemClock.elapsedRealtime() + 5000L;
+        String lastError = "not attempted";
+        while (SystemClock.elapsedRealtime() < deadline) {
+            LocalSocket probe = new LocalSocket();
+            try {
+                probe.connect(new LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT));
+                ProcessHelper.appendDiagnosticLine("XSERVER ABSTRACT SOCKET READY name=@" + socketName);
+                return;
+            }
+            catch (Exception error) {
+                lastError = error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage());
+            }
+            finally {
+                try { probe.close(); } catch (Exception ignored) {}
+            }
+            SystemClock.sleep(50L);
+        }
+        ProcessHelper.appendDiagnosticLine("XSERVER ABSTRACT SOCKET NOT READY name=@" + socketName + " lastError=" + lastError);
+        throw new IllegalStateException("XServer не принимает подключения через Android abstract socket: " + lastError);
+    }
+
+"""
+if "private void awaitXServerSocket()" not in s:
+    needle = "    private int execGuestProgram() {"
+    if needle not in s: raise SystemExit("GuestProgramLauncher exec method marker missing")
+    s = s.replace(needle, await_method + needle, 1)
+start_old = """            copyDefaultBox64RCFile();
+            pid = execGuestProgram();"""
+start_new = """            copyDefaultBox64RCFile();
+            awaitXServerSocket();
+            pid = execGuestProgram();"""
+if start_old not in s: raise SystemExit("GuestProgramLauncher.start insertion marker missing")
+s = s.replace(start_old, start_new, 1)
 old = """        envVars.put("DISPLAY", ":0");
         envVars.put("PATH", rootDir+rootFS.getWinePath()+"/bin:"+rootDir+"/usr/local/bin:"+rootDir+"/usr/bin");"""
 new = """        envVars.put("DISPLAY", UnixSocketConfig.XSERVER_DISPLAY);
