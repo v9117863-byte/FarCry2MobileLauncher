@@ -136,6 +136,12 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
                 Map<String, String> environment = processBuilder.environment();
                 for (String name : envVars) environment.put(name, envVars.get(name));
             }
+            // Android does not provide the POSIX /dev/shm implementation expected by
+            // this Wine build's esync. Disable esync explicitly; wineserver then uses
+            // Wine's regular synchronization path instead of failing at shm_open().
+            processBuilder.environment().put("WINEESYNC", "0");
+            processBuilder.environment().put("WINEFSYNC", "0");
+            appendDiagnosticLine("WINE_SYNC_CONFIG WINEESYNC=0 WINEFSYNC=0");
             appendDiagnosticLine("PROCESS START CALL");
             java.lang.Process process = processBuilder.start();
             appendDiagnosticLine("PROCESS START RETURNED");
