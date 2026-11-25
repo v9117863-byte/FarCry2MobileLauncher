@@ -78,9 +78,20 @@ class MainActivity : Activity() {
     // Some Android tar extractors restore RootFS contents without Unix execute bits.
     // Reapply them to Linux ELF binaries and shebang scripts before launching Box64/Wine.
     private fun restoreRootFSExecutePermissions(rootDir: File) {
-        var repaired = 0
+        var repairedFiles = 0
+        var repairedDirectories = 0
+        // EACCES can occur when a parent directory lacks search/execute permission.
         rootDir.walkTopDown().forEach { file ->
+            if (file.isDirectory) {
+                if (!file.canRead() && file.setReadable(true, false)) repairedDirectories++
+                if (!file.canExecute() && file.setExecutable(true, false)) repairedDirectories++
+                if (!file.canRead() || !file.canExecute()) {
+                    throw IllegalStateException("Нет прав прохода по каталогу RootFS: " + file.absolutePath)
+                }
+                return@forEach
+            }
             if (!file.isFile) return@forEach
+            if (!file.canRead() && file.setReadable(true, false)) repairedFiles++
             val executableCandidate = try {
                 java.io.FileInputStream(file).use { input ->
                     val header = ByteArray(4)
@@ -92,27 +103,30 @@ class MainActivity : Activity() {
                     (count >= 2 && header[0] == '#'.code.toByte() &&
                         header[1] == '!'.code.toByte())
                 }
-            } catch (_: Exception) {
-                false
-            }
+            } catch (_: Exception) { false }
             if (executableCandidate && !file.canExecute()) {
                 val changed = file.setExecutable(true, false)
                 if (!changed && !file.canExecute()) {
-                    throw IllegalStateException("Не удалось выставить права запуска: ${file.absolutePath}")
+                    throw IllegalStateException("Не удалось выставить права запуска: " + file.absolutePath)
                 }
-                repaired++
+                repairedFiles++
             }
         }
         val box64 = File(rootDir, "usr/local/bin/box64")
-        if (!box64.isFile) {
-            throw IllegalStateException("В RootFS отсутствует Box64: ${box64.absolutePath}")
+        if (!box64.isFile) throw IllegalStateException("В RootFS отсутствует Box64: " + box64.absolutePath)
+        if (!box64.canRead() && !box64.setReadable(true, false) && !box64.canRead()) {
+            throw IllegalStateException("Android не разрешил чтение Box64: " + box64.absolutePath)
         }
         if (!box64.canExecute() && !box64.setExecutable(true, false) && !box64.canExecute()) {
-            throw IllegalStateException("Android не разрешил запуск Box64: ${box64.absolutePath}")
+            throw IllegalStateException("Android не разрешил запуск Box64: " + box64.absolutePath)
         }
-        appendLaunchLog("ROOTFS_EXEC_PERMISSIONS repaired=$repaired box64Executable=${box64.canExecute()}")
+        var parent = box64.parentFile
+        while (parent != null && parent.toPath().startsWith(rootDir.toPath())) {
+            if (!parent.canExecute()) throw IllegalStateException("Нет права прохода к Box64 через каталог: " + parent.absolutePath)
+            parent = parent.parentFile
+        }
+        appendLaunchLog("ROOTFS_EXEC_PERMISSIONS repairedFiles=" + repairedFiles + " repairedDirectories=" + repairedDirectories + " box64Read=" + box64.canRead() + " box64Executable=" + box64.canExecute())
     }
-
     private fun appendLaunchLog(message: String) {
         try {
             val dir = getExternalFilesDir(null) ?: filesDir
