@@ -174,19 +174,17 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
             createDebugThread(process.getInputStream());
             createDebugThread(process.getErrorStream());
             try {
-                Field pidField = process.getClass().getDeclaredField("pid");
-                pidField.setAccessible(true);
-                pid = pidField.getInt(process);
+                pid = (int) process.pid();
                 appendDiagnosticLine("PROCESS PID=" + pid);
-                try { pidField.setAccessible(false); } catch (Exception ignored) {}
             }
-            catch (Exception pidError) {
-                appendDiagnosticLine("PID LOOKUP FAILED (process may still be running): " + pidError.getClass().getName() + ": " + String.valueOf(pidError.getMessage()));
+            catch (Throwable pidError) {
+                appendDiagnosticLine("PID LOOKUP FAILED: " + pidError.getClass().getName() + ": " + String.valueOf(pidError.getMessage()));
+                throw new java.io.IOException("Не удалось получить PID процесса Box64", pidError);
             }
             if (terminationCallback != null) createWaitForThread(process, terminationCallback);
         }
         catch (Throwable e) {
-            appendDiagnosticLine("ProcessHelper.exec ERROR: " + e.getClass().getName() + ": " + String.valueOf(e.getMessage()));
+            appendDiagnosticLine("ProcessHelper.exec ERROR: " + e.getClass().getName() + ": " + String.valueOf(e.getMessage()) + "\\n" + android.util.Log.getStackTraceString(e));
             android.util.Log.e("FarCry2Diagnostics", "ProcessHelper.exec failed", e);
         }
         return pid;
@@ -485,7 +483,8 @@ start_old = """            copyDefaultBox64RCFile();
             pid = execGuestProgram();"""
 start_new = """            copyDefaultBox64RCFile();
             awaitXServerSocket();
-            pid = execGuestProgram();"""
+            pid = execGuestProgram();
+            if (pid <= 0) throw new IllegalStateException("Box64 не запустился: ProcessHelper вернул PID " + pid + ". Открой «Скопировать отчёт» в лаунчере.");"""
 if start_old not in s: raise SystemExit("GuestProgramLauncher.start insertion marker missing")
 s = s.replace(start_old, start_new, 1)
 old = """        envVars.put("DISPLAY", ":0");
@@ -513,7 +512,17 @@ final_display = merge + """
         ProcessHelper.appendDiagnosticLine("WINE DISPLAY FINAL DISPLAY=" + UnixSocketConfig.XSERVER_DISPLAY);
 """
 if merge not in s: raise SystemExit("GuestProgramLauncher environment merge marker missing")
-guest.write_text(s.replace(merge, final_display, 1))
+s = s.replace(merge, final_display, 1)
+old_lib = '        envVars.put("BOX64_LD_LIBRARY_PATH", rootDir+"/lib/x86_64-linux-gnu");'
+new_lib = """        String box64LibraryPath = rootDir+"/usr/lib/x86_64-linux-gnu:"+rootDir+"/lib/x86_64-linux-gnu:"+rootDir+rootFS.getWinePath()+"/lib:"+rootDir+rootFS.getWinePath()+"/lib64";
+        envVars.put("BOX64_LD_LIBRARY_PATH", box64LibraryPath);
+        ProcessHelper.appendDiagnosticLine("BOX64_LD_LIBRARY_PATH=" + box64LibraryPath);
+        for (String libraryDir : box64LibraryPath.split(":")) {
+            ProcessHelper.appendDiagnosticLine("BOX64 LIB DIR " + libraryDir + " exists=" + new File(libraryDir).isDirectory());
+        }"""
+if old_lib not in s: raise SystemExit("Guest Box64 library path marker missing")
+s = s.replace(old_lib, new_lib, 1)
+guest.write_text(s)
 PY
 # Trace the actual Wine -> X11 connection, not merely socket-file creation.
 python3 - "$APP/java/com/winlator/xconnector/XConnectorEpoll.java" <<'PY'
