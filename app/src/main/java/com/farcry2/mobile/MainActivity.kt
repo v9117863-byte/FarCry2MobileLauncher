@@ -81,6 +81,49 @@ class MainActivity : Activity() {
         web.loadUrl("file:///android_asset/index.html")
     }
 
+    // Wine's Winlator build hardcodes the original package path. Redirect that
+    // exact-length string to an app-owned symlink so wineserver and ntdll use this RootFS.
+    private fun patchWineRootfsPath(rootDir: File) {
+        val oldPath = "/data/data/com.winlator/files/rootfs".toByteArray(Charsets.UTF_8)
+        val replacement = "/data/data/com.farcry2.mobile/r/////".toByteArray(Charsets.UTF_8)
+        check(oldPath.size == replacement.size) { "Wine path patch must preserve binary size" }
+
+        val alias = File(filesDir.parentFile, "r")
+        if (alias.exists() || android.system.Os.readlinkOrNullCompat(alias.absolutePath) != null) {
+            check(alias.canonicalFile == rootDir.canonicalFile) {
+                "Wine RootFS alias already exists and points elsewhere: " + alias.absolutePath
+            }
+        } else {
+            android.system.Os.symlink(rootDir.absolutePath, alias.absolutePath)
+        }
+
+        val targets = listOf(
+            File(rootDir, "opt/wine/bin/wineserver"),
+            File(rootDir, "opt/wine/lib/wine/x86_64-unix/ntdll.so")
+        )
+        for (target in targets) {
+            check(target.isFile) { "Wine component missing: " + target.absolutePath }
+            val bytes = target.readBytes()
+            var count = 0
+            var i = 0
+            while (i <= bytes.size - oldPath.size) {
+                var match = true
+                for (j in oldPath.indices) {
+                    if (bytes[i + j] != oldPath[j]) { match = false; break }
+                }
+                if (match) {
+                    System.arraycopy(replacement, 0, bytes, i, replacement.size)
+                    count++
+                    i += replacement.size
+                } else {
+                    i++
+                }
+            }
+            if (count > 0) target.writeBytes(bytes)
+            appendLaunchLog("WINE_ROOTFS_PATH_PATCH file=" + target.name + " replacements=" + count)
+        }
+    }
+
     // Some Android tar extractors restore RootFS contents without Unix execute bits.
     // Reapply them to Linux ELF binaries and shebang scripts before launching Box64/Wine.
     private fun restoreRootFSExecutePermissions(rootDir: File) {
@@ -407,6 +450,7 @@ class MainActivity : Activity() {
                     winlatorPrefs.edit().putString("current_box64_version", requestedBox64Version).apply()
                     appendLaunchLog("BOX64 INSTALL OK bytes=" + box64Binary.length() + " path=" + box64Binary.absolutePath)
                     restoreRootFSExecutePermissions(rootDir)
+                    patchWineRootfsPath(rootDir)
                     reportGameProgress(84, "Настраиваю игровую среду")
                     runOnUiThread {
                         try {
