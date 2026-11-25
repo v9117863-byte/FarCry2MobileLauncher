@@ -27,3 +27,5 @@ html,body{width:100%;height:100%;min-height:100%;margin:0;background:#000!import
 .settings-back{max-width:760px;margin:0 auto 12px;display:block}
 @media(orientation:portrait){.classic-scene{width:100vw;height:auto;aspect-ratio:16/9}.classic-brand{font-size:clamp(15px,4.6vw,28px)}.classic-title{font-size:clamp(19px,5.8vw,35px)}.classic-option{font-size:clamp(12px,3.2vw,19px)}.classic-panel{top:10%;bottom:8.5%}.settings-cats{grid-template-columns:1fr}}
 @media(max-height:420px){#settings,#video,#performance,#packs,#touch,#about,#worldmap,#manual{padding-top:7px}.settings-open{min-height:48px}}
+
+.classic-option{user-select:none;-webkit-tap-highlight-color:transparent;cursor:pointer}
