@@ -583,10 +583,10 @@ allocate_old = """static XConnectorEpoll* XConnectorEpoll_allocate(JNIEnv* env, 
     connector->serverFd = createServerSocket(sockPath);
     if (connector->serverFd < 0) goto error;
 
-    connector->abstractServerFd = createAbstractX11Socket(sockPath);
-    if (connector->abstractServerFd < 0) goto error;
     if (!addFdToEpoll(connector->epollFd, connector->serverFd, &connector->serverFd)) goto error;
 
+    connector->abstractServerFd = createAbstractX11Socket(sockPath);
+    if (connector->abstractServerFd < 0) goto error;
     if (!addFdToEpoll(connector->epollFd, connector->abstractServerFd, &connector->abstractServerFd)) {
         __android_log_print(ANDROID_LOG_ERROR, "FarCry2X11",
             "Failed to register abstract X11 socket in epoll: %s", strerror(errno));
