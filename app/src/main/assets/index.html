@@ -143,6 +143,9 @@ tabs.forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
 document.querySelectorAll('.settings-open').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.target)));
 const settingsPages=new Set(['video','performance','packs','touch','about']);
 $('homeTop').onclick=()=>switchTab('home');
+$('menuStart').addEventListener('click',launch);
+$('menuOptions').addEventListener('click',()=>switchTab('settings'));
+$('menuQuit').addEventListener('click',quitLauncher);
 function getFocusable(){const page=$(activeTab);return [...page.querySelectorAll('button:not(:disabled),select:not(:disabled),input:not(:disabled),[tabindex="0"]')].filter(el=>el.offsetParent!==null&&!el.closest('.hidden'))}
 function markFocus(){const list=getFocusable();list.forEach(e=>e.classList.remove('navfocus'));if(list.length){focusIndex=Math.max(0,Math.min(focusIndex,list.length-1));list[focusIndex].classList.add('navfocus');list[focusIndex].scrollIntoView({block:'nearest',behavior:'smooth'})}}
 function moveFocus(dir){const list=getFocusable();if(!list.length)return;let el=list[focusIndex]||document.activeElement;if(el&&el.matches('input[type=range]')&&(dir==='left'||dir==='right')){const step=Number(el.step)||1;el.value=String(Math.max(Number(el.min),Math.min(Number(el.max),Number(el.value)+(dir==='right'?step:-step))));el.dispatchEvent(new Event('input',{bubbles:true}));buzz();return}if(el&&el.tagName==='SELECT'&&(dir==='left'||dir==='right')){el.selectedIndex=Math.max(0,Math.min(el.options.length-1,el.selectedIndex+(dir==='right'?1:-1)));el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));buzz();return}focusIndex=(focusIndex+(dir==='down'?1:dir==='up'?-1:0)+list.length)%list.length;markFocus();buzz()}
