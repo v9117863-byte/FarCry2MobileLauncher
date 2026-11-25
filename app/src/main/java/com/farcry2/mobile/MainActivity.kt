@@ -613,7 +613,7 @@ class MainActivity : Activity() {
             js.contains("onGameFolderResult") -> "Папка игры обновлена"
             js.contains("onRuntimeResult") -> "Результат операции с runtime обновлён"
             js.contains("onGameLaunchProgress") -> "Подготовка игры: " + launchStage
-            js.contains("onGameLaunchResult") -> if (js.contains("true")) "Запуск игры передан Winlator" else "Не удалось запустить игру"
+            js.contains("onGameLaunchResult") -> if (js.contains("true")) "Игра запускается" else "Не удалось запустить игру"
             js.contains("onWorldMapResult") -> "Операция с картой завершена"
             else -> "Состояние обновлено"
         }
