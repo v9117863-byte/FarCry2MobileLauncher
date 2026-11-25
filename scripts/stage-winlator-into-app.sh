@@ -33,10 +33,8 @@ new = old + "\n        UnixSocketConfig.configureUniqueXServer();"
 if old not in s: raise SystemExit("XServerDisplayActivity onCreate marker missing")
 activity.write_text(s.replace(old, new, 1))
 s = guest.read_text()
-old = '        envVars.put("DISPLAY", UnixSocketConfig.XSERVER_DISPLAY);'
-new = '        envVars.put("DISPLAY", UnixSocketConfig.XSERVER_DISPLAY);'
-if old not in s: raise SystemExit("Guest DISPLAY assignment missing")
-guest.write_text(s.replace(old, new, 1))
+# DISPLAY is patched together with the diagnostic setup below.
+guest.write_text(s)
 PY
 # Persist subprocess output directly; upstream LogView only writes when its UI stream is usable.
 python3 - "$APP/java/com/winlator/core/ProcessHelper.java" <<'PY'
@@ -426,7 +424,7 @@ guest = Path(sys.argv[2])
 s = guest.read_text()
 old = """        envVars.put("DISPLAY", ":0");
         envVars.put("PATH", rootDir+rootFS.getWinePath()+"/bin:"+rootDir+"/usr/local/bin:"+rootDir+"/usr/bin");"""
-new = """        envVars.put("DISPLAY", ":0");
+new = """        envVars.put("DISPLAY", UnixSocketConfig.XSERVER_DISPLAY);
         File x11Socket = new File(rootDir, UnixSocketConfig.XSERVER_PATH);
         ProcessHelper.appendDiagnosticLine("WINE DISPLAY CONFIG DISPLAY=" + UnixSocketConfig.XSERVER_DISPLAY + " X11_SOCKET=" + x11Socket.getAbsolutePath() + " exists=" + x11Socket.exists() + " canRead=" + x11Socket.canRead() + " canWrite=" + x11Socket.canWrite());
         File fontConfig = new File(rootDir, "/etc/fonts/fonts.conf");
