@@ -36,6 +36,7 @@ import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var web: WebView
+    private var nativeUi: NativeLauncherUi? = null
     private val worker = Executors.newSingleThreadExecutor()
     private val prefs by lazy { getSharedPreferences("fc2", MODE_PRIVATE) }
     private var selectedTree: Uri? = null
@@ -52,33 +53,24 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         selectedTree = prefs.getString("game_tree_uri", null)?.let(Uri::parse)
-        web = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.allowFileAccess = true
-            settings.allowContentAccess = true
-            settings.mediaPlaybackRequiresUserGesture = false
-            webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    super.onPageFinished(view, url)
-                    val mapFile = File(filesDir, "world-map.jpg")
-                    if (mapFile.isFile && mapFile.length() <= 12L * 1024 * 1024) {
-                        // Pass a local file URI instead of a multi-megabyte Base64 string through evaluateJavascript.
-                        val localUri = Uri.fromFile(mapFile).toString()
-                        val mime = prefs.getString("world_map_mime", "image/jpeg") ?: "image/jpeg"
-                        view?.evaluateJavascript(
-                            "window.onWorldMapResult&&window.onWorldMapResult(true," + JSONObject.quote(localUri) + "," + JSONObject.quote("Сохранённая карта загружена") + "," + JSONObject.quote(mime) + ",true)",
-                            null
-                        )
-                    }
-                }
-            }
-            webChromeClient = WebChromeClient()
-            addJavascriptInterface(AndroidBridge(), "AndroidDevice")
-        }
         com.winlator.core.ProcessHelper.setNativeLibraryDir(applicationInfo.nativeLibraryDir)
-        setContentView(web)
-        web.loadUrl("file:///android_asset/index.html")
+        val bridge = AndroidBridge()
+        nativeUi = NativeLauncherUi(this, object : NativeLauncherUi.Actions {
+            override fun launch() = bridge.launchGame()
+            override fun chooseGameFolder() = bridge.chooseGameFolder()
+            override fun importGameFiles() = bridge.importGameFiles()
+            override fun chooseRuntimeFolder() = bridge.chooseRuntimeFolder()
+            override fun importRuntime() = bridge.importRuntimeFolder()
+            override fun chooseMap() = bridge.chooseWorldMap()
+            override fun stopGame() = bridge.stopGame()
+            override fun deviceInfo() = bridge.getDeviceInfo()
+            override fun gameStatus() = bridge.getGameInstallStatus()
+            override fun runtimeStatus() = bridge.getRuntimeBundleStatus()
+            override fun saveSettings(json: String) = bridge.saveLaunchSettings(json)
+            override fun copyError() = bridge.copyErrorToClipboard("Native launcher diagnostic report")
+        })
+        setContentView(nativeUi!!.root)
+        nativeUi!!.refreshStatus()
     }
 
     // Wine's Winlator build hardcodes the original package path. Redirect that
