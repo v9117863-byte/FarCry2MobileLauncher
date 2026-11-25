@@ -411,6 +411,24 @@ if first_window_old not in s:
 s = s.replace(first_window_old, first_window_new, 1)
 p.write_text(s)
 PY
+# Far Cry 2's DX10 path is known to fail after the splash screen under Wine on some systems.
+# Ubisoft's troubleshooting guidance recommends forcing the DX9 renderer and capping at 60 FPS.
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '''            cmdArgs = "/dir "+StringUtils.escapeDOSPath(execDir)+" \\""+filename+"\\""+execArgs;'''
+new = '''            if (filename.equalsIgnoreCase("FarCry2.exe")) {
+                execArgs = " -RenderProfile_Platform d3d9 -RenderProfile_MaxFps 60" + execArgs;
+            }
+            cmdArgs = "/dir "+StringUtils.escapeDOSPath(execDir)+" \\""+filename+"\\""+execArgs;'''
+if old not in s:
+    raise SystemExit("Far Cry 2 launch-argument insertion point not found")
+if "RenderProfile_Platform d3d9" not in s:
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
 # Add focused X11 diagnostics: the Wine log reports nodrv_CreateWindow, so record
 # whether Winlator successfully creates its Unix-domain display socket before Wine starts.
 python3 - "$APP/java/com/winlator/xenvironment/components/XServerComponent.java" "$APP/java/com/winlator/xenvironment/components/GuestProgramLauncherComponent.java" <<'PY'
