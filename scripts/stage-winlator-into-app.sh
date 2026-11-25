@@ -372,6 +372,46 @@ if first_window_old not in s:
 s = s.replace(first_window_old, first_window_new, 1)
 p.write_text(s)
 PY
+# Add focused X11 diagnostics: the Wine log reports nodrv_CreateWindow, so record
+# whether Winlator successfully creates its Unix-domain display socket before Wine starts.
+python3 - "$APP/java/com/winlator/xenvironment/components/XServerComponent.java" "$APP/java/com/winlator/xenvironment/components/GuestProgramLauncherComponent.java" <<'PY'
+from pathlib import Path
+import sys
+xserver = Path(sys.argv[1])
+s = xserver.read_text()
+old = """        connector = new XConnectorEpoll(socketConfig, new XClientConnectionHandler(xServer), new XClientRequestHandler());
+        connector.setInitialInputBufferCapacity(4096);
+        connector.setInitialOutputBufferCapacity(4096);
+        connector.setCanReceiveAncillaryMessages(true);
+        connector.start();"""
+new = """        com.winlator.core.ProcessHelper.appendDiagnosticLine("XSERVER BIND BEGIN path=" + socketConfig.path);
+        connector = new XConnectorEpoll(socketConfig, new XClientConnectionHandler(xServer), new XClientRequestHandler());
+        com.winlator.core.ProcessHelper.appendDiagnosticLine("XSERVER NATIVE SOCKET ALLOCATED path=" + socketConfig.path + " exists=" + new java.io.File(socketConfig.path).exists());
+        connector.setInitialInputBufferCapacity(4096);
+        connector.setInitialOutputBufferCapacity(4096);
+        connector.setCanReceiveAncillaryMessages(true);
+        connector.start();
+        com.winlator.core.ProcessHelper.appendDiagnosticLine("XSERVER EPOLL STARTED path=" + socketConfig.path + " exists=" + new java.io.File(socketConfig.path).exists());"""
+if old not in s: raise SystemExit("XServerComponent.start marker missing")
+xserver.write_text(s.replace(old, new, 1))
+guest = Path(sys.argv[2])
+s = guest.read_text()
+old = """        envVars.put("DISPLAY", ":0");
+        envVars.put("PATH", rootDir+rootFS.getWinePath()+"/bin:"+rootDir+"/usr/local/bin:"+rootDir+"/usr/bin");"""
+new = """        envVars.put("DISPLAY", ":0");
+        File x11Socket = new File(rootDir, UnixSocketConfig.XSERVER_PATH);
+        ProcessHelper.appendDiagnosticLine("WINE DISPLAY CONFIG DISPLAY=:0 X11_SOCKET=" + x11Socket.getAbsolutePath() + " exists=" + x11Socket.exists() + " canRead=" + x11Socket.canRead() + " canWrite=" + x11Socket.canWrite());
+        File fontConfig = new File(rootDir, "/etc/fonts/fonts.conf");
+        if (fontConfig.isFile()) {
+            envVars.put("FONTCONFIG_FILE", fontConfig.getAbsolutePath());
+            envVars.put("FONTCONFIG_PATH", new File(rootDir, "/etc/fonts").getAbsolutePath());
+            ProcessHelper.appendDiagnosticLine("FONTCONFIG CONFIGURED file=" + fontConfig.getAbsolutePath());
+        }
+        else ProcessHelper.appendDiagnosticLine("FONTCONFIG CONFIG MISSING expected=" + fontConfig.getAbsolutePath());
+        envVars.put("PATH", rootDir+rootFS.getWinePath()+"/bin:"+rootDir+"/usr/local/bin:"+rootDir+"/usr/bin");"""
+if old not in s: raise SystemExit("Guest DISPLAY setup marker missing")
+guest.write_text(s.replace(old, new, 1))
+PY
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
 if [[ -d "$UPSTREAM/app/src/main/jniLibs" ]]; then
   mkdir -p "$APP/jniLibs"
