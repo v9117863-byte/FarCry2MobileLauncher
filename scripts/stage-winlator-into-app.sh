@@ -677,8 +677,9 @@ jni_new = """    const char* pathPtr = (*env)->GetStringUTFChars(env, sockPath, 
         return 0;
     }
     return (jlong)connector;"""
-if !s.includes(jni_old) throw new Error("nativeAllocate wrapper marker not found");
-s = s.replace(jni_old, jni_new, 1);
+if jni_old not in s:
+    raise SystemExit("nativeAllocate wrapper marker not found")
+s = s.replace(jni_old, jni_new, 1)
 
 p.write_text(s)
 PY
