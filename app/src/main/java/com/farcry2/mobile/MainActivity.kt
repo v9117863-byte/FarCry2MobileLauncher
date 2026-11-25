@@ -593,7 +593,7 @@ class MainActivity : Activity() {
                 if (!dxvkLogDir.isDirectory) dxvkLogDir.mkdirs()
                 gameEnv.put("DXVK_LOG_LEVEL", "info")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
-                gameEnv.put("WINEDEBUG", "+loaddll,+seh")
+                gameEnv.put("WINEDEBUG", "+process,+loaddll,+seh")
                 container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
                 appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
