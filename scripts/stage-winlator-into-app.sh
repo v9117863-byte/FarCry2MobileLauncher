@@ -458,6 +458,113 @@ if "FC2_X11_CLIENT_CONNECTED" not in s:
 p.write_text(s)
 PY
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
+# Wine's Xlib connects to the Linux abstract X11 socket before the filesystem
+# socket. The filesystem socket lives inside RootFS, while Wine itself is not
+# chrooted, so /tmp/.X11-unix/X0 on Android cannot reach that RootFS pathname.
+# Publish the same X server on the abstract AF_UNIX address as well.
+python3 - "$APP/cpp/winlator/src/xconnector_epoll.c" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = """    int serverFd;
+    int shutdownFd;"""
+new = """    int serverFd;
+    int abstractServerFd;
+    int shutdownFd;"""
+if old not in s: raise SystemExit("XConnectorEpoll server fd fields not found")
+s = s.replace(old, new, 1)
+needle = """static void loadJMethods(JMethods* jmethods) {"""
+helper = """static int createAbstractX11Socket(const char* sockPath) {
+    if (strstr(sockPath, "/tmp/.X11-unix/X0") == NULL) return -1;
+
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+
+    struct sockaddr_un address = {0};
+    address.sun_family = AF_UNIX;
+    const char* displayPath = "/tmp/.X11-unix/X0";
+    size_t pathLength = strlen(displayPath);
+    address.sun_path[0] = '\\0';
+    memcpy(address.sun_path + 1, displayPath, pathLength);
+
+    socklen_t addressLength = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + 1 + pathLength);
+    if (bind(fd, (struct sockaddr*)&address, addressLength) < 0) goto error;
+    if (listen(fd, MAX_EVENTS) < 0) goto error;
+
+    __android_log_print(ANDROID_LOG_INFO, "FarCry2X11",
+        "Bound abstract X11 socket @%s", displayPath);
+    return fd;
+
+error:
+    __android_log_print(ANDROID_LOG_ERROR, "FarCry2X11",
+        "Failed to bind abstract X11 socket: %s", strerror(errno));
+    CLOSEFD(fd);
+    return -1;
+}
+
+"""
+if needle not in s: raise SystemExit("XConnectorEpoll JNI method marker missing")
+s = s.replace(needle, helper + needle, 1)
+old = """    if (connector->serverFd > 0) {
+        removeFdFromEpoll(connector->epollFd, connector->serverFd);
+        CLOSEFD(connector->serverFd);
+    }
+
+    if (connector->shutdownFd > 0) {"""
+new = """    if (connector->serverFd > 0) {
+        removeFdFromEpoll(connector->epollFd, connector->serverFd);
+        CLOSEFD(connector->serverFd);
+    }
+
+    if (connector->abstractServerFd > 0) {
+        removeFdFromEpoll(connector->epollFd, connector->abstractServerFd);
+        CLOSEFD(connector->abstractServerFd);
+    }
+
+    if (connector->shutdownFd > 0) {"""
+if old not in s: raise SystemExit("XConnectorEpoll destroy socket block missing")
+s = s.replace(old, new, 1)
+old = """    XConnectorEpoll* connector = calloc(1, sizeof(XConnectorEpoll));
+
+    connector->epollFd = epoll_create(MAX_EVENTS);"""
+new = """    XConnectorEpoll* connector = calloc(1, sizeof(XConnectorEpoll));
+    connector->abstractServerFd = -1;
+
+    connector->epollFd = epoll_create(MAX_EVENTS);"""
+if old not in s: raise SystemExit("XConnectorEpoll allocate block missing")
+s = s.replace(old, new, 1)
+old = """    if (!addFdToEpoll(connector->epollFd, connector->serverFd, &connector->serverFd)) goto error;
+    if (!addFdToEpoll(connector->epollFd, connector->shutdownFd, &connector->shutdownFd)) goto error;"""
+new = """    if (!addFdToEpoll(connector->epollFd, connector->serverFd, &connector->serverFd)) goto error;
+
+    connector->abstractServerFd = createAbstractX11Socket(sockPath);
+    if (connector->abstractServerFd >= 0 &&
+            !addFdToEpoll(connector->epollFd, connector->abstractServerFd, &connector->abstractServerFd)) {
+        CLOSEFD(connector->abstractServerFd);
+        connector->abstractServerFd = -1;
+    }
+
+    if (!addFdToEpoll(connector->epollFd, connector->shutdownFd, &connector->shutdownFd)) goto error;"""
+if old not in s: raise SystemExit("XConnectorEpoll epoll registration block missing")
+s = s.replace(old, new, 1)
+old = """            if (events[i].data.ptr == &connector->serverFd) {
+                int clientFd = accept(connector->serverFd, NULL, NULL);
+                if (clientFd >= 0) XConnectorEpoll_handleNewConnection(connector, clientFd);
+            }
+            else if (events[i].data.ptr != &connector->shutdownFd &&"""
+new = """            if (events[i].data.ptr == &connector->serverFd ||
+                    events[i].data.ptr == &connector->abstractServerFd) {
+                int listeningFd = events[i].data.ptr == &connector->abstractServerFd ?
+                    connector->abstractServerFd : connector->serverFd;
+                int clientFd = accept(listeningFd, NULL, NULL);
+                if (clientFd >= 0) XConnectorEpoll_handleNewConnection(connector, clientFd);
+            }
+            else if (events[i].data.ptr != &connector->shutdownFd &&"""
+if old not in s: raise SystemExit("XConnectorEpoll accept dispatch block missing")
+s = s.replace(old, new, 1)
+p.write_text(s)
+PY
 if [[ -d "$UPSTREAM/app/src/main/jniLibs" ]]; then
   mkdir -p "$APP/jniLibs"
   cp -a "$UPSTREAM/app/src/main/jniLibs/." "$APP/jniLibs/"
