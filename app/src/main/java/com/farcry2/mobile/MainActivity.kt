@@ -330,7 +330,10 @@ class MainActivity : Activity() {
                     reportGameProgress(10, "Проверяю системные файлы")
                     val rootFS = RootFS.find(this@MainActivity)
                     val rootDir = rootFS.rootDir
-                    if (!rootFS.isValid()) {
+                    // RootFS.isValid() checks its version marker, not whether the Box64
+                    // executable survived extraction. Treat a missing Box64 as an incomplete install.
+                    val box64BeforeRepair = File(rootDir, "usr/local/bin/box64")
+                    if (!rootFS.isValid() || !box64BeforeRepair.isFile) {
                         reportGameProgress(18, "Подготавливаю системные файлы")
                         if (rootDir.exists() && !rootDir.deleteRecursively()) {
                             throw IllegalStateException("Не удалось очистить повреждённый RootFS")
