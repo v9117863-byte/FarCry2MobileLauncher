@@ -57,6 +57,7 @@ class MainActivity : Activity() {
         val bridge = AndroidBridge()
         nativeUi = NativeLauncherUi(this, object : NativeLauncherUi.Actions {
             override fun launch() = bridge.launchGame()
+            override fun resumeGame() { this@MainActivity.finish() }
             override fun chooseGameFolder() = bridge.chooseGameFolder()
             override fun importGameFiles() = bridge.importGameFiles()
             override fun chooseRuntimeFolder() = bridge.chooseRuntimeFolder()
@@ -607,7 +608,15 @@ class MainActivity : Activity() {
     }
 
     private fun evaluate(js: String) {
-        if (::web.isInitialized) web.evaluateJavascript(js, null)
+        val message = when {
+            js.contains("onGameFolderResult") -> "Папка игры обновлена"
+            js.contains("onRuntimeResult") -> "Результат операции с runtime обновлён"
+            js.contains("onGameLaunchProgress") -> "Подготовка игры: " + launchStage
+            js.contains("onGameLaunchResult") -> if (js.contains("true")) "Запуск игры передан Winlator" else "Не удалось запустить игру"
+            js.contains("onWorldMapResult") -> "Операция с картой завершена"
+            else -> "Состояние обновлено"
+        }
+        runOnUiThread { nativeUi?.onNativeMessage(message) }
     }
 
     private fun findFile(dir: DocumentFile, wanted: String): DocumentFile? {
@@ -699,6 +708,7 @@ class MainActivity : Activity() {
 
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
-        if (::web.isInitialized && web.canGoBack()) web.goBack() else super.onBackPressed()
+        val active = try { com.winlator.XServerDisplayActivity.isSessionActive() } catch (_: Exception) { false }
+        if (active) nativeUi?.showPauseMenu() else super.onBackPressed()
     }
 }
