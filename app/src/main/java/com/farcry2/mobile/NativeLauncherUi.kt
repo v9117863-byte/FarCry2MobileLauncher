@@ -144,6 +144,10 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
     private fun showHome() {
         currentPage = "home"
         heading("FIELD OPERATIONS", "AFRICA  /  SINGLE PLAYER")
+        body.addView(button("Импортировать игру") {
+            val state = try { JSONObject(actions.gameStatus()) } catch (_: Exception) { JSONObject() }
+            if (state.optBoolean("folderSelected")) actions.importGameFiles() else actions.chooseGameFolder()
+        })
         body.addView(button("▶   Запустить игру", true) {
             val result = try { JSONObject(actions.launch()) } catch (_: Exception) { JSONObject() }
             message(result.optString("message", "Запрос запуска отправлен"))
@@ -211,7 +215,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             actions.saveSettings(json.toString())
             message("Настройки сохранены")
         })
-        body.addView(button("Дополнительные модули") { showRuntime() })
+        body.addView(button("Игровые компоненты") { showRuntime() })
         body.addView(button("Назад") { if (currentPage == "settings") showHome() })
     }
 
@@ -224,7 +228,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
 
     private fun showRuntime() {
         currentPage = "runtime"
-        heading("SYSTEM", "WINLATOR RUNTIME COMPONENTS")
+        heading("SYSTEM", "GAME COMPONENTS")
         runtimeState = text("Проверка компонентов…", 12f, Color.WHITE)
         body.addView(runtimeState)
         body.addView(button("Выбрать папку модуля") { actions.chooseRuntimeFolder() })
@@ -262,7 +266,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         if (::runtimeState.isInitialized) {
             runtimeState.text = try {
                 val r = JSONObject(actions.runtimeStatus())
-                when { r.optBoolean("winlatorBundled") -> "Winlator встроен в APK"
+                when { r.optBoolean("winlatorBundled") -> "Игровые компоненты встроены в приложение"
                     r.optBoolean("imported") -> "Дополнительный модуль установлен"
                     else -> "Используются системные компоненты APK" }
             } catch (_: Exception) { "Статус недоступен" }
