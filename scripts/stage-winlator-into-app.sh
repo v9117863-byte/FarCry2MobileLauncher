@@ -336,7 +336,22 @@ if [[ ! -f "$BOX64_ARCHIVE" ]]; then
   echo "Pinned Box64 archive not found: $BOX64_ARCHIVE" >&2
   exit 4
 fi
-BOX64_MEMBER=$(tar --zstd -tf "$BOX64_ARCHIVE" | grep -E '(^|/)usr/local/bin/box64# Replace temporary theme fallbacks with upstream's complete resource set.
+tar --zstd -tf "$BOX64_ARCHIVE" > /tmp/fc2-box64-members.txt
+BOX64_MEMBER=""
+while IFS= read -r member; do
+  case "$member" in
+    usr/local/bin/box64|*/usr/local/bin/box64) BOX64_MEMBER="$member"; break ;;
+  esac
+done < /tmp/fc2-box64-members.txt
+if [[ -z "$BOX64_MEMBER" ]]; then
+  echo "usr/local/bin/box64 was not found inside $BOX64_ARCHIVE" >&2
+  exit 5
+fi
+mkdir -p "$APP/jniLibs/arm64-v8a"
+tar --zstd -xOf "$BOX64_ARCHIVE" "$BOX64_MEMBER" > "$APP/jniLibs/arm64-v8a/libbox64.so"
+chmod 0755 "$APP/jniLibs/arm64-v8a/libbox64.so"
+file "$APP/jniLibs/arm64-v8a/libbox64.so"
+# Replace temporary theme fallbacks with upstream's complete resource set.
 rm -f "$APP/res/values/winlator_theme_fallback.xml"
 cp -a "$UPSTREAM/app/src/main/res/." "$APP/res/"
 # Rebrand the native startup overlay while keeping the underlying graphics/session engine intact.
@@ -369,15 +384,6 @@ echo "C/C++: $(find "$APP/cpp" -type f | wc -l)"
 echo "JNI: $(find "$APP/jniLibs" -type f 2>/dev/null | wc -l)"
 echo "Resources: $(find "$APP/res" -type f | wc -l)"
 echo "Assets: $(find "$APP/assets" -type f | wc -l)"
- | head -n1 || true)
-if [[ -z "$BOX64_MEMBER" ]]; then
-  echo "usr/local/bin/box64 was not found inside $BOX64_ARCHIVE" >&2
-  exit 5
-fi
-mkdir -p "$APP/jniLibs/arm64-v8a"
-tar --zstd -xOf "$BOX64_ARCHIVE" "$BOX64_MEMBER" > "$APP/jniLibs/arm64-v8a/libbox64.so"
-chmod 0755 "$APP/jniLibs/arm64-v8a/libbox64.so"
-file "$APP/jniLibs/arm64-v8a/libbox64.so"
 # Replace temporary theme fallbacks with upstream's complete resource set.
 rm -f "$APP/res/values/winlator_theme_fallback.xml"
 cp -a "$UPSTREAM/app/src/main/res/." "$APP/res/"
