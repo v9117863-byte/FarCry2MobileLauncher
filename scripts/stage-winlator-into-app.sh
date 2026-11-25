@@ -78,6 +78,25 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
         try {
             String[] commandArgs = splitCommand(command);
             appendDiagnosticLine("PROCESS ARGUMENTS READY: argc=" + commandArgs.length + ", cwd=" + String.valueOf(workingDir));
+            if (commandArgs.length > 0) {
+                File executable = new File(commandArgs[0]);
+                if (executable.isFile()) {
+                    try {
+                        android.system.Os.chmod(executable.getAbsolutePath(), 0755);
+                        File parent = executable.getParentFile();
+                        while (parent != null && workingDir != null && parent.getAbsolutePath().startsWith(workingDir.getAbsolutePath())) {
+                            android.system.Os.chmod(parent.getAbsolutePath(), 0755);
+                            if (parent.equals(workingDir)) break;
+                            parent = parent.getParentFile();
+                        }
+                        appendDiagnosticLine("EXECUTABLE PERMISSIONS: path=" + executable + ", canExecute=" + executable.canExecute() + ", length=" + executable.length());
+                    }
+                    catch (Throwable permissionError) {
+                        appendDiagnosticLine("EXECUTABLE CHMOD ERROR: " + permissionError.getClass().getName() + ": " + String.valueOf(permissionError.getMessage()));
+                    }
+                }
+                else appendDiagnosticLine("EXECUTABLE MISSING: " + executable.getAbsolutePath());
+            }
             ProcessBuilder processBuilder = new ProcessBuilder(commandArgs).directory(workingDir);
             appendDiagnosticLine("PROCESS BUILDER READY");
             if (envVars != null) {
