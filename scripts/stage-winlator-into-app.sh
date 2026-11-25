@@ -479,7 +479,8 @@ if old not in s: raise SystemExit("XConnectorEpoll server fd fields not found")
 s = s.replace(old, new, 1)
 needle = """static void loadJMethods(JMethods* jmethods) {"""
 helper = """static int createAbstractX11Socket(const char* sockPath) {
-    if (strstr(sockPath, "/tmp/.X11-unix/X0") == NULL) return -1;
+    __android_log_print(ANDROID_LOG_INFO, "FarCry2X11",
+        "Creating abstract X11 socket for filesystem path: %s", sockPath ? sockPath : "(null)");
 
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) return -1;
