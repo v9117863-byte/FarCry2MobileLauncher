@@ -89,9 +89,7 @@ started_old = """            pid = pidField.getInt(process);
             createDebugThread(process.getErrorStream());"""
 started_new = """            pid = pidField.getInt(process);
             pidField.setAccessible(false);
-            appendDiagnosticLine("Process started; pid=" + pid);
-            createDebugThread(process.getInputStream());
-            createDebugThread(process.getErrorStream());"""
+            appendDiagnosticLine("Process started; pid=" + pid);"""
 if started_old not in s: raise SystemExit("ProcessHelper process-start marker not found")
 s = s.replace(started_old, started_new, 1)
 import re
