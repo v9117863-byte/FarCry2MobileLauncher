@@ -17,6 +17,14 @@ android {
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 
+    packaging {
+        jniLibs {
+            // Keep native payloads in nativeLibraryDir so Box64 can be execve'd
+            // on Android versions that mount app-private filesystems noexec.
+            useLegacyPackaging = true
+        }
+    }
+
     if (file("src/main/cpp/CMakeLists.txt").isFile) {
         externalNativeBuild {
             cmake {
