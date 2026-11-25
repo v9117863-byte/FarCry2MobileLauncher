@@ -18,7 +18,10 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 needle = "    private static void createDebugThread(final InputStream inputStream) {"
-method = """    private static java.io.File getDiagnosticLogFile() {
+method = """    private static volatile String nativeLibraryDir;
+    public static void setNativeLibraryDir(String path) { nativeLibraryDir = path; }
+
+    private static java.io.File getDiagnosticLogFile() {
         java.io.File external = new java.io.File(
             android.os.Environment.getExternalStorageDirectory(),
             "Android/data/com.farcry2.mobile/files/Winlator/logs.txt"
@@ -94,18 +97,17 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
             // that writable directory noexec, so execute the same ARM64 binary from
             // PackageManager's executable nativeLibraryDir copy instead.
             if (commandArgs.length > 0 && commandArgs[0].endsWith("/usr/local/bin/box64")) {
-                String nativeLibraryPath = System.getProperty("java.library.path", "");
+                String nativeLibraryPath = nativeLibraryDir;
                 boolean relocated = false;
-                for (String directory : nativeLibraryPath.split(":")) {
-                    File packagedBox64 = new File(directory, "libbox64.so");
+                if (nativeLibraryPath != null && !nativeLibraryPath.isEmpty()) {
+                    File packagedBox64 = new File(nativeLibraryPath, "libbox64.so");
                     if (packagedBox64.isFile() && packagedBox64.canExecute()) {
                         appendDiagnosticLine("BOX64_EXEC_PATH: " + commandArgs[0] + " -> " + packagedBox64.getAbsolutePath());
                         commandArgs[0] = packagedBox64.getAbsolutePath();
                         relocated = true;
-                        break;
                     }
                 }
-                if (!relocated) appendDiagnosticLine("BOX64_EXEC_PATH ERROR: executable libbox64.so not found in java.library.path=" + nativeLibraryPath);
+                if (!relocated) appendDiagnosticLine("BOX64_EXEC_PATH ERROR: libbox64.so missing/not executable; nativeLibraryDir=" + String.valueOf(nativeLibraryPath));
             }
             appendDiagnosticLine("PROCESS ARGUMENTS READY: argc=" + commandArgs.length + ", executable=" + (commandArgs.length > 0 ? commandArgs[0] : "<none>") + ", cwd=" + String.valueOf(workingDir));
             if (commandArgs.length > 0) {
