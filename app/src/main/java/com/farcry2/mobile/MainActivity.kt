@@ -563,12 +563,16 @@ class MainActivity : Activity() {
                     prefs.getString("launch_settings", null)?.let { JSONObject(it) }
                 } catch (_: Exception) { null }
                 val requestedDriver = launchSettings?.optString("graphicsDriver", "Системный") ?: "Системный"
+                // DXVK in this X11 guest needs VK_KHR_surface. Android's direct
+                // Turnip Vulkan loader does not expose the X11 WSI surface required by
+                // Wine's DXVK instance here. Winlator's Vortek bridge is the upstream
+                // path that forwards guest Vulkan work to the Android renderer and
+                // provides the X11 surface integration.
                 val graphicsDriver = when (requestedDriver) {
-                    "Turnip" -> com.winlator.container.GraphicsDrivers.TURNIP + "," +
-                        com.winlator.container.GraphicsDrivers.DEFAULT_OPENGL_DRIVER
                     "VirGL" -> com.winlator.container.GraphicsDrivers.VORTEK + "," +
                         com.winlator.container.GraphicsDrivers.VIRGL
-                    else -> com.winlator.container.GraphicsDrivers.getDefaultDriver(this@MainActivity)
+                    else -> com.winlator.container.GraphicsDrivers.VORTEK + "," +
+                        com.winlator.container.GraphicsDrivers.DEFAULT_OPENGL_DRIVER
                 }
                 container.setGraphicsDriver(graphicsDriver)
                 // Far Cry 2 uses Direct3D 9. Keep DXVK as the renderer: WineD3D
