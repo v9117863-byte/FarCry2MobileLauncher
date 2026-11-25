@@ -64,7 +64,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             scrollBarStyle = View.SCROLLBARS_INSIDE_INSET
         }
         val content = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
-        scroll.addView(content, ScrollView.LayoutParams(-1, -2))
+        scroll.addView(content, ViewGroup.LayoutParams(-1, -2))
         panel.addView(scroll, FrameLayout.LayoutParams(-1, -1))
         val panelParams = LinearLayout.LayoutParams(0, -1, 0.38f)
         row.addView(panel, panelParams)
@@ -326,9 +326,8 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             }
             // Darken the right edge for legible title artwork.
             p.shader = LinearGradient(w*.45f,0f,w,h,
-                intArrayOf(Color.TRANSPARENT,Color.argb(125,12,19,17)),Shader.TileMode.CLAMP)
+                Color.TRANSPARENT,Color.argb(125,12,19,17),Shader.TileMode.CLAMP)
             canvas.drawRect(w*.45f,0f,w,h,p); p.shader = null
         }
     }
-}
 }
