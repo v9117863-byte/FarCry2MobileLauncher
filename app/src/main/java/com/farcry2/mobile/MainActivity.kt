@@ -75,6 +75,44 @@ class MainActivity : Activity() {
         web.loadUrl("file:///android_asset/index.html")
     }
 
+    // Some Android tar extractors restore RootFS contents without Unix execute bits.
+    // Reapply them to Linux ELF binaries and shebang scripts before launching Box64/Wine.
+    private fun restoreRootFSExecutePermissions(rootDir: File) {
+        var repaired = 0
+        rootDir.walkTopDown().forEach { file ->
+            if (!file.isFile) return@forEach
+            val executableCandidate = try {
+                java.io.FileInputStream(file).use { input ->
+                    val header = ByteArray(4)
+                    val count = input.read(header)
+                    (count >= 4 && header[0] == 0x7f.toByte() &&
+                        header[1] == 'E'.code.toByte() &&
+                        header[2] == 'L'.code.toByte() &&
+                        header[3] == 'F'.code.toByte()) ||
+                    (count >= 2 && header[0] == '#'.code.toByte() &&
+                        header[1] == '!'.code.toByte())
+                }
+            } catch (_: Exception) {
+                false
+            }
+            if (executableCandidate && !file.canExecute()) {
+                val changed = file.setExecutable(true, false)
+                if (!changed && !file.canExecute()) {
+                    throw IllegalStateException("Не удалось выставить права запуска: ${file.absolutePath}")
+                }
+                repaired++
+            }
+        }
+        val box64 = File(rootDir, "usr/local/bin/box64")
+        if (!box64.isFile) {
+            throw IllegalStateException("В RootFS отсутствует Box64: ${box64.absolutePath}")
+        }
+        if (!box64.canExecute() && !box64.setExecutable(true, false) && !box64.canExecute()) {
+            throw IllegalStateException("Android не разрешил запуск Box64: ${box64.absolutePath}")
+        }
+        appendLaunchLog("ROOTFS_EXEC_PERMISSIONS repaired=$repaired box64Executable=${box64.canExecute()}")
+    }
+
     private fun appendLaunchLog(message: String) {
         try {
             val dir = getExternalFilesDir(null) ?: filesDir
@@ -296,6 +334,7 @@ class MainActivity : Activity() {
                         reportGameProgress(76, "Проверяю установленную систему")
                         rootFS.createRFSVersionFile(RootFSInstaller.LATEST_VERSION.toInt())
                     }
+                    restoreRootFSExecutePermissions(rootDir)
                     if (!rootFS.isValid()) throw IllegalStateException("RootFS не прошёл проверку после установки")
                     reportGameProgress(84, "Настраиваю игровую среду")
                     runOnUiThread {
