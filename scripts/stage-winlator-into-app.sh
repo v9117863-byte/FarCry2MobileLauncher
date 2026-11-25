@@ -26,11 +26,11 @@ old = '''        boolean changed = !cacheId.equals(currentGraphicsDriver);
         if (changed) {'''
 new = '''        File rootDir = rootFS.getRootDir();
         File libDir = rootFS.getLibDir();
-        File vulkanICDDir = new File(rootDir, "/usr/share/vulkan/icd.d");
+        File vortekICDCheckDir = new File(rootDir, "/usr/share/vulkan/icd.d");
         boolean vortekPayloadMissing = graphicsDriver[0].equals(GraphicsDrivers.VORTEK) &&
             (!new File(libDir, "libvulkan_vortek.so").isFile() ||
-             vulkanICDDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")) == null ||
-             vulkanICDDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")).length == 0);
+             vortekICDCheckDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")) == null ||
+             vortekICDCheckDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")).length == 0);
         boolean gladioPayloadMissing = graphicsDriver[1].equals(GraphicsDrivers.GLADIO) &&
             !new File(libDir, "libGL.so.1.7.0").isFile();
         boolean changed = !cacheId.equals(currentGraphicsDriver) || vortekPayloadMissing || gladioPayloadMissing;
@@ -64,10 +64,10 @@ new_end = '''            case GraphicsDrivers.GLADIO:
         // Do not mark the driver as installed until extraction has completed.
         if (graphicsDriver[0].equals(GraphicsDrivers.VORTEK) &&
                 (!new File(libDir, "libvulkan_vortek.so").isFile() ||
-                 vulkanICDDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")) == null ||
-                 vulkanICDDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")).length == 0)) {
+                 vortekICDCheckDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")) == null ||
+                 vortekICDCheckDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")).length == 0)) {
             throw new IllegalStateException("Vortek Vulkan ICD extraction incomplete: lib=" +
-                new File(libDir, "libvulkan_vortek.so").isFile() + ", ICD directory=" + vulkanICDDir);
+                new File(libDir, "libvulkan_vortek.so").isFile() + ", ICD directory=" + vortekICDCheckDir);
         }
         if (graphicsDriver[1].equals(GraphicsDrivers.GLADIO) && !new File(libDir, "libGL.so.1.7.0").isFile()) {
             throw new IllegalStateException("Gladio OpenGL driver extraction incomplete: " + new File(libDir, "libGL.so.1.7.0"));
