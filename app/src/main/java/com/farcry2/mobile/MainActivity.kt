@@ -511,6 +511,22 @@ class MainActivity : Activity() {
                 driveMap.append("F:").append(gameDir.absolutePath)
                 container.setDrives(driveMap.toString())
                 container.setScreenSize(resolveRequestedScreenSize())
+                // Apply the graphics choice from the launcher. Previously the UI saved
+                // this preference but the Winlator container kept its default Vortek
+                // Vulkan driver, so the visible "Turnip" selection had no effect.
+                val launchSettings = try {
+                    prefs.getString("launch_settings", null)?.let { JSONObject(it) }
+                } catch (_: Exception) { null }
+                val requestedDriver = launchSettings?.optString("graphicsDriver", "Системный") ?: "Системный"
+                val graphicsDriver = when (requestedDriver) {
+                    "Turnip" -> com.winlator.container.GraphicsDrivers.TURNIP + "," +
+                        com.winlator.container.GraphicsDrivers.DEFAULT_OPENGL_DRIVER
+                    "VirGL" -> com.winlator.container.GraphicsDrivers.VORTEK + "," +
+                        com.winlator.container.GraphicsDrivers.VIRGL
+                    else -> com.winlator.container.GraphicsDrivers.getDefaultDriver(this@MainActivity)
+                }
+                container.setGraphicsDriver(graphicsDriver)
+                appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
                 val intent = Intent(this@MainActivity, com.winlator.XServerDisplayActivity::class.java).apply {
