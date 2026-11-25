@@ -536,7 +536,7 @@ class MainActivity : Activity() {
                 } else {
                     val oldProfile = fc2Profile.readText()
                     val forcedDx9Profile = oldProfile.replace(
-                        Regex("Platform=\\"[^\\"]*\\""),
+                        Regex("Platform=\\\"[^\\\"]*\\\""),
                         "Platform=\\"d3d9\\""
                     )
                     if (forcedDx9Profile != oldProfile) fc2Profile.writeText(forcedDx9Profile)
