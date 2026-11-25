@@ -437,6 +437,17 @@ new = """        envVars.put("DISPLAY", UnixSocketConfig.XSERVER_DISPLAY);
         envVars.put("PATH", rootDir+rootFS.getWinePath()+"/bin:"+rootDir+"/usr/local/bin:"+rootDir+"/usr/bin");"""
 if old not in s: raise SystemExit("Guest DISPLAY setup marker missing")
 guest.write_text(s.replace(old, new, 1))
+# Container-specific environment variables are merged after the initial defaults.
+# Re-assert the dynamic display AFTER that merge so a saved DISPLAY=:0 cannot
+# point Wine away from the per-process X11 listener.
+s = guest.read_text()
+merge = '        if (this.envVars != null) envVars.putAll(this.envVars);'
+final_display = merge + """
+        envVars.put("DISPLAY", UnixSocketConfig.XSERVER_DISPLAY);
+        ProcessHelper.appendDiagnosticLine("WINE DISPLAY FINAL DISPLAY=" + UnixSocketConfig.XSERVER_DISPLAY);
+"""
+if merge not in s: raise SystemExit("GuestProgramLauncher environment merge marker missing")
+guest.write_text(s.replace(merge, final_display, 1))
 PY
 # Trace the actual Wine -> X11 connection, not merely socket-file creation.
 python3 - "$APP/java/com/winlator/xconnector/XConnectorEpoll.java" <<'PY'
