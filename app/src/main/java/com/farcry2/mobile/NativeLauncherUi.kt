@@ -3,6 +3,8 @@ package com.farcry2.mobile
 import android.app.Activity
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
+import android.content.res.ColorStateList
+import android.graphics.drawable.RippleDrawable
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Handler
@@ -104,11 +106,14 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
             setTextColor(if (selected) Color.rgb(22, 26, 23) else cream)
             setPadding(dp(12), dp(7), dp(12), dp(7))
-            background = GradientDrawable().apply {
-                setColor(if (selected) Color.rgb(236, 231, 211) else Color.TRANSPARENT)
-                cornerRadius = dp(1).toFloat()
-                if (selected) setStroke(dp(1), Color.rgb(250, 246, 224))
+            val face = GradientDrawable().apply {
+                setColor(if (selected) Color.rgb(221, 211, 180) else Color.argb(28, 232, 225, 195))
+                cornerRadius = dp(2).toFloat()
+                setStroke(dp(1), if (selected) Color.rgb(250, 240, 211) else Color.argb(75, 230, 222, 188))
             }
+            background = RippleDrawable(
+                ColorStateList.valueOf(Color.argb(95, 255, 236, 190)), face, null
+            )
             isClickable = true
             isFocusable = true
             setOnClickListener { playClick(); onClick() }
