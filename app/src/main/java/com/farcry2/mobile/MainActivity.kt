@@ -585,7 +585,7 @@ class MainActivity : Activity() {
                 gameEnv.put("WINEDLLOVERRIDES", "d3d9=n,b;dxgi=n,b")
                 // The previous run hid all DXVK output (upstream defaults to "none").
                 // Capture renderer initialization and Wine DLL loading into RootFS/tmp.
-                val dxvkLogDir = File(rootDir, "tmp")
+                val dxvkLogDir = File(RootFS.find(this@MainActivity).rootDir, "tmp")
                 if (!dxvkLogDir.isDirectory) dxvkLogDir.mkdirs()
                 gameEnv.put("DXVK_LOG_LEVEL", "info")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
