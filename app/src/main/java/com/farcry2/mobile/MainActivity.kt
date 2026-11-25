@@ -334,6 +334,13 @@ class MainActivity : Activity() {
                     // executable survived extraction. Treat a missing Box64 as an incomplete install.
                     val box64BeforeRepair = File(rootDir, "usr/local/bin/box64")
                     if (!rootFS.isValid() || !box64BeforeRepair.isFile) {
+                        if (!box64BeforeRepair.isFile) {
+                            // Box64 is a separately installed GeneralComponents package, not part of rootfs.tzst.
+                            // Clear Winlator's cached version so GuestProgramLauncherComponent extracts it again.
+                            androidx.preference.PreferenceManager.getDefaultSharedPreferences(this@MainActivity)
+                                .edit().remove("current_box64_version").apply()
+                            appendLaunchLog("BOX64 CACHE RESET: missing " + box64BeforeRepair.absolutePath)
+                        }
                         reportGameProgress(18, "Подготавливаю системные файлы")
                         if (rootDir.exists() && !rootDir.deleteRecursively()) {
                             throw IllegalStateException("Не удалось очистить повреждённый RootFS")
