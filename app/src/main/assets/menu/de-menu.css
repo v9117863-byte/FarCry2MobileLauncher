@@ -48,3 +48,15 @@ body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;bac
 @media(min-width:700px){:root{--de-menu-w:205px}.hero{max-width:none;margin-right:20px}.sectionnav.de-menu{padding-left:13px;padding-right:13px}.tab{min-height:60px;font-size:10px}.main{padding-right:20px}.card{padding:18px}.de-feature{min-height:225px}}
 @media(max-width:390px){.brand{font-size:18px}.sub{font-size:7px}.hero{padding:12px}.hero p{max-width:190px}.tab{grid-template-columns:21px minmax(0,1fr);font-size:8px;padding:7px 4px}.tab-icon{font-size:15px}.card{padding:10px}.card h2{font-size:8px}.action{padding:10px 8px}}
 @media(max-height:520px){.sectionnav.de-menu{padding-top:7px}.tab{min-height:43px}.de-menu-caption{padding-bottom:6px}.hero{min-height:125px;margin-top:7px;margin-bottom:7px}.main{padding-bottom:90px}}
+
+/* Distinct original artwork for every menu window */
+.hero{background-image:linear-gradient(90deg,#090a08eF,#11110dc9 48%,#17130d33),url("scene-home.svg");background-position:center;background-size:cover}
+#home .de-feature{background-image:linear-gradient(90deg,#0b0b09eF,#17130d88),url("scene-home.svg");background-position:center;background-size:cover}
+#settings .card{background-image:linear-gradient(110deg,#10140feF,#16140fd9),url("texture-settings.svg");background-size:cover}
+#video .card{background-image:linear-gradient(110deg,#100f0deF,#19160fdd),url("texture-settings.svg");background-size:cover}
+#performance .card{background-image:linear-gradient(110deg,#11110deF,#17150fdd),url("texture-performance.svg");background-size:cover}
+#packs .card{background-image:linear-gradient(110deg,#15120deF,#21190fdd),url("texture-addons.svg");background-size:cover}
+#touch .card{background-image:linear-gradient(110deg,#10140feF,#172018dd),url("texture-controls.svg");background-size:cover}
+#about .card{background-image:linear-gradient(110deg,#0e1512eF,#152019dd),url("texture-device.svg");background-size:cover}
+#worldmap .card{background-image:linear-gradient(110deg,#11130deF,#1a1a10bb),url("texture-map.svg");background-size:cover}
+#manual .card{background-image:linear-gradient(110deg,#30271bE8,#201a12e8),url("texture-paper.svg");background-size:cover}
