@@ -240,6 +240,8 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         }
     }
 
+    fun isPauseMenuVisible(): Boolean = currentPage == "pause"
+
     fun onNativeMessage(value: String) {
         message(value)
         refreshStatus()
