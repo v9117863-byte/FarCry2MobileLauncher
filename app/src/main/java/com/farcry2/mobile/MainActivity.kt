@@ -580,6 +580,14 @@ class MainActivity : Activity() {
                 // is not provided), as confirmed by the device log.
                 container.setDXWrapper(com.winlator.container.DXWrappers.DXVK)
                 container.setDXWrapperConfig("")
+                // The imported game lives in app-private storage, which is not one of
+                // Winlator's default D:/E: drives. Register it before XServerDisplayActivity
+                // creates dosdevices symlinks and converts exec_path to a DOS path.
+                val gameDrivePath = File(filesDir, "game").canonicalPath
+                val gameDriveAlreadyMapped = container.drivesIterator().any { it.path == gameDrivePath }
+                if (!gameDriveAlreadyMapped) {
+                    container.setDrives(container.drives + "F:" + gameDrivePath)
+                }
                 val gameEnv = com.winlator.core.EnvVars(container.getEnvVars())
                 gameEnv.put("WINEESYNC", "0")
                 gameEnv.put("WINEFSYNC", "0")
