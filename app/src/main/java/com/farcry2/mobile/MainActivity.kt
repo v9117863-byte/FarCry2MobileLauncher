@@ -22,6 +22,8 @@ import androidx.documentfile.provider.DocumentFile
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
 import com.winlator.core.TarCompressorUtils
+import com.winlator.core.GeneralComponents
+import com.winlator.core.DefaultVersion
 import com.winlator.xenvironment.RootFS
 import com.winlator.xenvironment.RootFSInstaller
 import org.json.JSONObject
@@ -358,8 +360,22 @@ class MainActivity : Activity() {
                         reportGameProgress(76, "Проверяю установленную систему")
                         rootFS.createRFSVersionFile(RootFSInstaller.LATEST_VERSION.toInt())
                     }
-                    restoreRootFSExecutePermissions(rootDir)
                     if (!rootFS.isValid()) throw IllegalStateException("RootFS не прошёл проверку после установки")
+                    // Box64 is a separate Winlator component archive, not included in rootfs.tzst.
+                    // Install it explicitly here instead of relying on a cached-version check during launch.
+                    val winlatorPrefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this@MainActivity)
+                    val requestedBox64Version = winlatorPrefs.getString("box64_version", DefaultVersion.BOX64) ?: DefaultVersion.BOX64
+                    val box64Binary = File(rootDir, "usr/local/bin/box64")
+                    if (!box64Binary.isFile || box64Binary.length() == 0L) {
+                        appendLaunchLog("BOX64 INSTALL BEGIN version=" + requestedBox64Version + " archive=box64/box64-" + requestedBox64Version + ".tzst")
+                        GeneralComponents.extractFile(GeneralComponents.Type.BOX64, this@MainActivity, requestedBox64Version, DefaultVersion.BOX64)
+                    }
+                    if (!box64Binary.isFile || box64Binary.length() == 0L) {
+                        throw IllegalStateException("Не удалось установить Box64 из архива box64-" + requestedBox64Version + ".tzst. Проверь комплектность APK.")
+                    }
+                    winlatorPrefs.edit().putString("current_box64_version", requestedBox64Version).apply()
+                    appendLaunchLog("BOX64 INSTALL OK bytes=" + box64Binary.length() + " path=" + box64Binary.absolutePath)
+                    restoreRootFSExecutePermissions(rootDir)
                     reportGameProgress(84, "Настраиваю игровую среду")
                     runOnUiThread {
                         try {
