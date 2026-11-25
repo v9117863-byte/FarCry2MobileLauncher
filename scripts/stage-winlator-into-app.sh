@@ -10,6 +10,75 @@ fi
 mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
+# Upstream caches the selected graphics driver in SharedPreferences before extraction.
+# If RootFS was recreated or extraction was interrupted, that stale cache suppresses
+# Vortek's Vulkan ICD on the next launch. Validate the actual installed payload and only
+# commit the cache after all required driver archives have been extracted.
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '''        boolean changed = !cacheId.equals(currentGraphicsDriver);
+        File rootDir = rootFS.getRootDir();
+        File libDir = rootFS.getLibDir();
+
+        if (changed) {'''
+new = '''        File rootDir = rootFS.getRootDir();
+        File libDir = rootFS.getLibDir();
+        File vulkanICDDir = new File(rootDir, "/usr/share/vulkan/icd.d");
+        boolean vortekPayloadMissing = graphicsDriver[0].equals(GraphicsDrivers.VORTEK) &&
+            (!new File(libDir, "libvulkan_vortek.so").isFile() ||
+             vulkanICDDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")) == null ||
+             vulkanICDDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")).length == 0);
+        boolean gladioPayloadMissing = graphicsDriver[1].equals(GraphicsDrivers.GLADIO) &&
+            !new File(libDir, "libGL.so.1.7.0").isFile();
+        boolean changed = !cacheId.equals(currentGraphicsDriver) || vortekPayloadMissing || gladioPayloadMissing;
+
+        if (changed) {'''
+if old not in s: raise SystemExit("Upstream graphics cache block not found; refusing to patch")
+s = s.replace(old, new, 1)
+old_pref = '''            preferences.edit().putString("current_graphics_driver", cacheId).apply();
+        }
+
+        if (graphicsDriver[0].equals(GraphicsDrivers.TURNIP)) {'''
+new_pref = '''        }
+
+        if (graphicsDriver[0].equals(GraphicsDrivers.TURNIP)) {'''
+if old_pref not in s: raise SystemExit("Upstream premature graphics cache write not found")
+s = s.replace(old_pref, new_pref, 1)
+old_end = '''            case GraphicsDrivers.GLADIO:
+                envVars.put("GLADIO_NO_ERROR", "1");
+
+                if (changed || MainActivity.DEBUG_MODE) TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/gladio-"+DefaultVersion.GLADIO+".tzst", rootDir);
+                break;
+        }
+    }'''
+new_end = '''            case GraphicsDrivers.GLADIO:
+                envVars.put("GLADIO_NO_ERROR", "1");
+
+                if (changed || MainActivity.DEBUG_MODE) TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, this, "graphics_driver/gladio-"+DefaultVersion.GLADIO+".tzst", rootDir);
+                break;
+        }
+
+        // Do not mark the driver as installed until extraction has completed.
+        if (graphicsDriver[0].equals(GraphicsDrivers.VORTEK) &&
+                (!new File(libDir, "libvulkan_vortek.so").isFile() ||
+                 vulkanICDDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")) == null ||
+                 vulkanICDDir.listFiles((dir, name) -> name.toLowerCase().contains("vortek") && name.endsWith(".json")).length == 0)) {
+            throw new IllegalStateException("Vortek Vulkan ICD extraction incomplete: lib=" +
+                new File(libDir, "libvulkan_vortek.so").isFile() + ", ICD directory=" + vulkanICDDir);
+        }
+        if (graphicsDriver[1].equals(GraphicsDrivers.GLADIO) && !new File(libDir, "libGL.so.1.7.0").isFile()) {
+            throw new IllegalStateException("Gladio OpenGL driver extraction incomplete: " + new File(libDir, "libGL.so.1.7.0"));
+        }
+        preferences.edit().putString("current_graphics_driver", cacheId).apply();
+    }'''
+if old_end not in s: raise SystemExit("Upstream graphics extraction method end not found")
+s = s.replace(old_end, new_end, 1)
+p.write_text(s)
+PY
+
 # Keep the conventional X11 display :0. Winlator's Android X11 bridge and
 # Box64's wrapped libX11 use the standard X0 abstract socket; a per-process
 # display number is not required because only one session runs in this app.
