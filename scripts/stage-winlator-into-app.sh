@@ -228,11 +228,17 @@ oncreate = "        super.onCreate(savedInstanceState);"
 if "activeInstance = this;" not in s:
     if oncreate not in s: raise SystemExit("XServer onCreate marker not found")
     s = s.replace(oncreate, oncreate + "\n        activeInstance = this;", 1)
-# Hardware Back in the game opens the launcher's native pause menu as a new Activity.
-# The launcher is deliberately stacked above XServer; Continue finishes it and reveals the game again.
-if 'show_pause_menu' not in s:
-    back_handler = """
-    @Override
+# Replace Winlator's navigation drawer Back handler with our separate native pause screen.
+old_back = """    @Override
+    public void onBackPressed() {
+        if (environment != null) {
+            if (!drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                drawerLayout.openDrawer(GravityCompat.START);
+            }
+            else drawerLayout.closeDrawers();
+        }
+    }"""
+new_back = """    @Override
     public void onBackPressed() {
         if (activeInstance == this && !isFinishing()) {
             android.content.Intent pauseIntent = new android.content.Intent(
@@ -241,11 +247,9 @@ if 'show_pause_menu' not in s:
             startActivity(pauseIntent);
         }
         else super.onBackPressed();
-    }
-"""
-    marker = "    private static volatile XServerDisplayActivity activeInstance;"
-    if marker not in s: raise SystemExit("XServer active-session marker not found")
-    s = s.replace(marker, back_handler + "\n" + marker, 1)
+    }"""
+if old_back not in s: raise SystemExit("Original XServer Back handler not found")
+s = s.replace(old_back, new_back, 1)
 destroy_old = """    protected void onDestroy() {
         winHandler.stop();"""
 destroy_new = """    protected void onDestroy() {
