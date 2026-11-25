@@ -193,8 +193,13 @@ class MainActivity : Activity() {
                 val winlatorLog = File(dir, "Winlator/logs.txt")
                 val launcherLines = if (launcherLog.isFile) launcherLog.readLines(Charsets.UTF_8).takeLast(60) else listOf("Журнал лаунчера пуст")
                 val winlatorLines = if (winlatorLog.isFile) winlatorLog.readLines(Charsets.UTF_8).takeLast(120) else listOf("Журнал Wine/Box64 пока не создан")
+                val dxvkDir = File(RootFS.find(this@MainActivity).rootDir, "tmp")
+                val dxvkLogs = dxvkDir.listFiles()?.filter { it.isFile && it.name.endsWith(".log") }?.takeLast(4)
+                    ?.flatMap { file -> listOf("DXVK FILE: " + file.name) + file.readLines(Charsets.UTF_8).takeLast(100) }
+                    ?: listOf("Отдельные DXVK-логи пока не созданы")
                 "ЛАУНЧЕР:\\n" + launcherLines.joinToString("\\n") +
-                    "\\n\\nWINE / BOX64 / XSERVER:\\n" + winlatorLines.joinToString("\\n")
+                    "\\n\\nWINE / BOX64 / XSERVER:\\n" + winlatorLines.joinToString("\\n") +
+                    "\\n\\nDXVK:\\n" + dxvkLogs.joinToString("\\n")
             } catch (e: Exception) {
                 "Не удалось прочитать журналы: " + (e.message ?: "неизвестная ошибка")
             }
@@ -574,9 +579,21 @@ class MainActivity : Activity() {
                 val gameEnv = com.winlator.core.EnvVars(container.getEnvVars())
                 gameEnv.put("WINEESYNC", "0")
                 gameEnv.put("WINEFSYNC", "0")
+                // Explicitly prefer DXVK's native D3D9/DXGI DLLs for this 32-bit game.
+                // Wine's registry defaults are not enough to diagnose whether the
+                // native wrapper is actually selected in the experimental WoW64 path.
+                gameEnv.put("WINEDLLOVERRIDES", "d3d9=n,b;dxgi=n,b")
+                // The previous run hid all DXVK output (upstream defaults to "none").
+                // Capture renderer initialization and Wine DLL loading into RootFS/tmp.
+                val dxvkLogDir = File(rootDir, "tmp")
+                if (!dxvkLogDir.isDirectory) dxvkLogDir.mkdirs()
+                gameEnv.put("DXVK_LOG_LEVEL", "info")
+                gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
+                gameEnv.put("WINEDEBUG", "+loaddll,+seh")
                 container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
-                appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk env=WINEESYNC:0,WINEFSYNC:0")
+                appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
+                appendLaunchLog("DXVK_DIAGNOSTICS level=info path=" + dxvkLogDir.absolutePath + " WINEDEBUG=+loaddll,+seh")
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
                 val intent = Intent(this@MainActivity, com.winlator.XServerDisplayActivity::class.java).apply {
