@@ -388,36 +388,3 @@ echo "C/C++: $(find "$APP/cpp" -type f | wc -l)"
 echo "JNI: $(find "$APP/jniLibs" -type f 2>/dev/null | wc -l)"
 echo "Resources: $(find "$APP/res" -type f | wc -l)"
 echo "Assets: $(find "$APP/assets" -type f | wc -l)"
-# Replace temporary theme fallbacks with upstream's complete resource set.
-rm -f "$APP/res/values/winlator_theme_fallback.xml"
-cp -a "$UPSTREAM/app/src/main/res/." "$APP/res/"
-# Rebrand the native startup overlay while keeping the underlying graphics/session engine intact.
-python3 - "$APP/res/values/strings.xml" "$APP/res/values-ru/strings.xml" <<'PY'
-from pathlib import Path
-import sys
-for name in sys.argv[1:]:
-    p = Path(name)
-    if not p.exists():
-        continue
-    s = p.read_text()
-    if 'name="starting_up"' in s:
-        import re
-        s = re.sub(r'(<string name="starting_up">).*?(</string>)', lambda m: m.group(1) + "Preparing Far Cry 2..." + m.group(2), s, count=1)
-    if 'name="loading"' in s:
-        import re
-        label = "Preparing Far Cry 2..." if "/values/" in name else "Подготовка Far Cry 2..."
-        s = re.sub(r'(<string name="loading">).*?(</string>)', lambda m: m.group(1) + label + m.group(2), s, count=1)
-    p.write_text(s)
-PY
-while IFS= read -r -d '' file; do
-  rel="${file#"$UPSTREAM/app/src/main/assets/"}"
-  [[ "$rel" == "index.html" ]] && continue
-  mkdir -p "$APP/assets/$(dirname "$rel")"
-  if [[ -e "$APP/assets/$rel" ]]; then echo "Asset collision: $rel" >&2; exit 2; fi
-  cp "$file" "$APP/assets/$rel"
-done < <(find "$UPSTREAM/app/src/main/assets" -type f -print0)
-echo "Java: $(find "$APP/java/com/winlator" -type f -name '*.java' | wc -l)"
-echo "C/C++: $(find "$APP/cpp" -type f | wc -l)"
-echo "JNI: $(find "$APP/jniLibs" -type f 2>/dev/null | wc -l)"
-echo "Resources: $(find "$APP/res" -type f | wc -l)"
-echo "Assets: $(find "$APP/assets" -type f | wc -l)"
