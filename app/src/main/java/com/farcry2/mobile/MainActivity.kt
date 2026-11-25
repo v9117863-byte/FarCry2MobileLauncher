@@ -710,6 +710,8 @@ class MainActivity : Activity() {
     @Deprecated("Deprecated in Android")
     override fun onBackPressed() {
         val active = try { com.winlator.XServerDisplayActivity.isSessionActive() } catch (_: Exception) { false }
-        if (active) nativeUi?.showPauseMenu() else super.onBackPressed()
+        if (active) {
+            if (nativeUi?.isPauseMenuVisible() == true) finish() else nativeUi?.showPauseMenu()
+        } else super.onBackPressed()
     }
 }
