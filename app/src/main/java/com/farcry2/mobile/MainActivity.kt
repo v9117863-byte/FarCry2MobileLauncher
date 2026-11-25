@@ -566,7 +566,16 @@ class MainActivity : Activity() {
                     else -> com.winlator.container.GraphicsDrivers.getDefaultDriver(this@MainActivity)
                 }
                 container.setGraphicsDriver(graphicsDriver)
+                // Far Cry 2 is forced to Direct3D 9. Prefer Wine built-in D3D9-to-OpenGL
+                // over the default DXVK Vulkan translation path for broader Android GPU compatibility.
+                container.setDXWrapper(com.winlator.container.DXWrappers.WINED3D)
+                container.setDXWrapperConfig("")
+                val gameEnv = com.winlator.core.EnvVars(container.getEnvVars())
+                gameEnv.put("WINEESYNC", "0")
+                gameEnv.put("WINEFSYNC", "0")
+                container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
+                appendLaunchLog("DX9_COMPATIBILITY wrapper=wined3d env=WINEESYNC:0,WINEFSYNC:0")
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
                 val intent = Intent(this@MainActivity, com.winlator.XServerDisplayActivity::class.java).apply {
