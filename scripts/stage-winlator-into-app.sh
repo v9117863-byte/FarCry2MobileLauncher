@@ -28,6 +28,19 @@ method = """    private static java.io.File getDiagnosticLogFile() {
         return new java.io.File("/data/data/com.farcry2.mobile/files/Winlator/logs.txt");
     }
 
+    public static synchronized String readDiagnosticLogTail() {
+        java.io.File logFile = getDiagnosticLogFile();
+        try {
+            if (!logFile.isFile()) return "Журнал Wine/Box64 ещё не создан: " + logFile.getAbsolutePath();
+            java.util.List<String> lines = java.nio.file.Files.readAllLines(logFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            int from = Math.max(0, lines.size() - 200);
+            return String.join("\\n", lines.subList(from, lines.size()));
+        }
+        catch (Exception error) {
+            return "Не удалось прочитать журнал " + logFile.getAbsolutePath() + ": " + error;
+        }
+    }
+
     public static synchronized void appendDiagnosticLine(String line) {
         java.io.File logFile = getDiagnosticLogFile();
         String entry = "[" + new java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(new java.util.Date()) + "] " + line;
@@ -260,6 +273,16 @@ startup_new = """        final java.util.concurrent.atomic.AtomicReference<Strin
                 .setTitle("Запуск Far Cry 2 задерживается")
                 .setMessage("Winlator всё ещё выполняет этап:\\n\\n" + stage + "\\n\\nМожно подождать или вернуться в лаунчер. Подробности этапов записаны в системный журнал Android.")
                 .setPositiveButton("Продолжить ожидание", null)
+                .setNeutralButton("Скопировать журнал", (dialog, which) -> {
+                    try {
+                        android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Far Cry 2 Winlator diagnostics", com.winlator.core.ProcessHelper.readDiagnosticLogTail()));
+                        Toast.makeText(this, "Журнал Wine/Box64 скопирован", Toast.LENGTH_LONG).show();
+                    }
+                    catch (Throwable copyError) {
+                        Toast.makeText(this, "Не удалось скопировать журнал: " + copyError.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                })
                 .setNegativeButton("Вернуться в лаунчер", (dialog, which) -> finish())
                 .setCancelable(false)
                 .show();
