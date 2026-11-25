@@ -350,6 +350,10 @@ fi
 mkdir -p "$APP/jniLibs/arm64-v8a"
 tar --zstd -xOf "$BOX64_ARCHIVE" "$BOX64_MEMBER" > "$APP/jniLibs/arm64-v8a/libbox64.so"
 chmod 0755 "$APP/jniLibs/arm64-v8a/libbox64.so"
+# The upstream Box64 ELF embeds the upstream package ID in PT_INTERP. Our app
+# uses com.farcry2.mobile, so rewrite the loader path to this app's extracted RootFS.
+patchelf --set-interpreter /data/data/com.farcry2.mobile/files/rootfs/lib/ld-linux-aarch64.so.1 "$APP/jniLibs/arm64-v8a/libbox64.so"
+echo "Box64 interpreter: $(patchelf --print-interpreter "$APP/jniLibs/arm64-v8a/libbox64.so")"
 file "$APP/jniLibs/arm64-v8a/libbox64.so"
 # Replace temporary theme fallbacks with upstream's complete resource set.
 rm -f "$APP/res/values/winlator_theme_fallback.xml"
