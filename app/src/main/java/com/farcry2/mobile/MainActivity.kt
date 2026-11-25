@@ -14,6 +14,9 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -142,6 +145,26 @@ class MainActivity : Activity() {
     }
 
     inner class AndroidBridge {
+        @JavascriptInterface fun copyErrorToClipboard(errorText: String) {
+            val logTail = try {
+                val dir = getExternalFilesDir(null) ?: filesDir
+                val logFile = File(dir, "fc2-launch.log")
+                if (logFile.isFile) logFile.readLines(Charsets.UTF_8).takeLast(100).joinToString("\n") else "Журнал запуска пока пуст"
+            } catch (e: Exception) {
+                "Не удалось прочитать журнал: " + (e.message ?: "неизвестная ошибка")
+            }
+            val report = "FAR CRY 2 MOBILE — ОТЧЁТ ОБ ОШИБКЕ\n\n" + errorText +
+                "\n\nПОСЛЕДНИЕ ЗАПИСИ ЖУРНАЛА:\n" + logTail
+            runOnUiThread {
+                try {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Far Cry 2 error report", report))
+                    Toast.makeText(this@MainActivity, "Текст ошибки и лог скопированы", Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(this@MainActivity, "Не удалось скопировать ошибку: " + (e.message ?: ""), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
         @JavascriptInterface fun getDeviceInfo(): String {
             val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
             val mem = ActivityManager.MemoryInfo()
