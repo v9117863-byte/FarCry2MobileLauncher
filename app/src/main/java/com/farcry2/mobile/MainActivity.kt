@@ -148,10 +148,17 @@ class MainActivity : Activity() {
         @JavascriptInterface fun copyErrorToClipboard(errorText: String) {
             val logTail = try {
                 val dir = getExternalFilesDir(null) ?: filesDir
-                val logFile = File(dir, "fc2-launch.log")
-                if (logFile.isFile) logFile.readLines(Charsets.UTF_8).takeLast(100).joinToString("\n") else "Журнал запуска пока пуст"
+                val launcherLog = File(dir, "fc2-launch.log")
+                // Winlator subprocess diagnostics are written separately by ProcessHelper.
+                // Include them too: a missing X11 window often means Box64/Wine failed
+                // before the launcher itself receives a Java exception.
+                val winlatorLog = File(dir, "Winlator/logs.txt")
+                val launcherLines = if (launcherLog.isFile) launcherLog.readLines(Charsets.UTF_8).takeLast(60) else listOf("Журнал лаунчера пуст")
+                val winlatorLines = if (winlatorLog.isFile) winlatorLog.readLines(Charsets.UTF_8).takeLast(120) else listOf("Журнал Wine/Box64 пока не создан")
+                "ЛАУНЧЕР:\\n" + launcherLines.joinToString("\\n") +
+                    "\\n\\nWINE / BOX64 / XSERVER:\\n" + winlatorLines.joinToString("\\n")
             } catch (e: Exception) {
-                "Не удалось прочитать журнал: " + (e.message ?: "неизвестная ошибка")
+                "Не удалось прочитать журналы: " + (e.message ?: "неизвестная ошибка")
             }
             val report = "FAR CRY 2 MOBILE — ОТЧЁТ ОБ ОШИБКЕ\n\n" + errorText +
                 "\n\nПОСЛЕДНИЕ ЗАПИСИ ЖУРНАЛА:\n" + logTail
