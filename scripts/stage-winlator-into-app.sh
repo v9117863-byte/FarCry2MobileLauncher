@@ -71,20 +71,17 @@ if thread_old not in s:
     raise SystemExit("ProcessHelper debug thread gate not found")
 s = s.replace(thread_old, thread_new, 1)
 # Add explicit process-launch markers and preserve exceptions that upstream silently swallowed.
-exec_old = """    public static int exec(String command, EnvVars envVars, File workingDir, Callback<Integer> terminationCallback) {
-        int pid = -1;
-        try {
-            ProcessBuilder processBuilder = (new ProcessBuilder(splitCommand(command))).directory(workingDir);"""
-exec_new = """    public static int exec(String command, EnvVars envVars, File workingDir, Callback<Integer> terminationCallback) {
+exec_method = """    public static int exec(String command, EnvVars envVars, File workingDir, Callback<Integer> terminationCallback) {
         int pid = -1;
         appendDiagnosticLine("ProcessHelper.exec BEGIN: " + command);
         try {
             String[] commandArgs = splitCommand(command);
             appendDiagnosticLine("PROCESS ARGUMENTS READY: argc=" + commandArgs.length + ", cwd=" + String.valueOf(workingDir));
-            ProcessBuilder processBuilder = (new ProcessBuilder(commandArgs)).directory(workingDir);
+            ProcessBuilder processBuilder = new ProcessBuilder(commandArgs).directory(workingDir);
             appendDiagnosticLine("PROCESS BUILDER READY");
             if (envVars != null) {
-                for (String name : envVars) processBuilder.environment().put(name, envVars.get(name));
+                Map<String, String> environment = processBuilder.environment();
+                for (String name : envVars) environment.put(name, envVars.get(name));
             }
             appendDiagnosticLine("PROCESS START CALL");
             java.lang.Process process = processBuilder.start();
@@ -102,21 +99,18 @@ exec_new = """    public static int exec(String command, EnvVars envVars, File w
                 appendDiagnosticLine("PID LOOKUP FAILED (process may still be running): " + pidError.getClass().getName() + ": " + String.valueOf(pidError.getMessage()));
             }
             if (terminationCallback != null) createWaitForThread(process, terminationCallback);
-            return pid;"""
-if exec_old not in s: raise SystemExit("ProcessHelper exec start marker not found")
-s = s.replace(exec_old, exec_new, 1)
-import re
-pattern = r'        }\s*catch \(Exception e\) \{\}\s*return pid;\s*}'
-match = re.search(pattern, s)
-if not match:
-    raise SystemExit("ProcessHelper exec catch block not found (relaxed regex)")
-catch_new = """        }
+        }
         catch (Throwable e) {
             appendDiagnosticLine("ProcessHelper.exec ERROR: " + e.getClass().getName() + ": " + String.valueOf(e.getMessage()));
             android.util.Log.e("FarCry2Diagnostics", "ProcessHelper.exec failed", e);
         }
         return pid;
     }"""
+pattern = re.compile(r'public static int exec\(String command, EnvVars envVars, File workingDir, Callback<Integer> terminationCallback\) \{.*?\n    \}', re.S)
+s = Path(sys.argv[1]).read_text()
+if not pattern.search(s):
+    raise SystemExit("ProcessHelper exec method not found")
+s = pattern.sub(lambda m: exec_method, s, count=1)
 p.write_text(s)
 PY
 # Fail gracefully instead of crashing if the saved container or imported EXE vanished.
