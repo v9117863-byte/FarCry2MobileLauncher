@@ -190,7 +190,7 @@ active_field = """
         final XServerDisplayActivity activity = activeInstance;
         if (activity == null) return false;
         activity.runOnUiThread(() -> {
-            android.util.Log.i("FarCry2X11", "STOP REQUEST: finishing active Winlator session");
+            com.winlator.core.ProcessHelper.appendDiagnosticLine("STOP REQUEST: finishing active Winlator session");
             activity.finish();
         });
         return true;
@@ -206,7 +206,7 @@ destroy_old = """    protected void onDestroy() {
         winHandler.stop();"""
 destroy_new = """    protected void onDestroy() {
         if (activeInstance == this) activeInstance = null;
-        android.util.Log.i("FarCry2X11", "XServerDisplayActivity destroyed");
+        com.winlator.core.ProcessHelper.appendDiagnosticLine("XServerDisplayActivity destroyed");
         winHandler.stop();"""
 if destroy_old in s:
     s = s.replace(destroy_old, destroy_new, 1)
@@ -249,7 +249,7 @@ s = s.replace(old, new, 1)
 # Keep the failure visible instead of silently restarting the launcher when Wine exits.
 old_cb = 'guestProgramLauncherComponent.setTerminationCallback((status) -> exit());'
 new_cb = """guestProgramLauncherComponent.setTerminationCallback((status) -> {
-            android.util.Log.i("FarCry2X11", "WINE PROCESS EXITED status=" + status);
+            com.winlator.core.ProcessHelper.appendDiagnosticLine("WINE PROCESS EXITED status=" + status);
             runOnUiThread(() -> {
             new AlertDialog.Builder(this)
                 .setTitle("Far Cry 2 не запустилась")
@@ -309,28 +309,28 @@ startup_new = """        final java.util.concurrent.atomic.AtomicReference<Strin
                 if (!isGenerateWineprefix()) {
                     startupStage.set("Подготовка файлов Wine");
                     android.util.Log.i("FarCry2Startup", startupStage.get());
-                    android.util.Log.i("FarCry2X11", "STARTUP: " + startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                     setupWineSystemFiles();
                     startupStage.set("Распаковка графического драйвера");
                     android.util.Log.i("FarCry2Startup", startupStage.get());
-                    android.util.Log.i("FarCry2X11", "STARTUP: " + startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                     extractGraphicsDriverFiles();
                     startupStage.set("Настройка звука Wine");
                     android.util.Log.i("FarCry2Startup", startupStage.get());
-                    android.util.Log.i("FarCry2X11", "STARTUP: " + startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                     changeWineAudioDriver();
                 }
                 startupStage.set("Запуск X-сервера и Wine");
                 android.util.Log.i("FarCry2Startup", startupStage.get());
-                    android.util.Log.i("FarCry2X11", "STARTUP: " + startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                 setupXEnvironment();
                 startupStage.set("Ожидание первого окна игры");
                 android.util.Log.i("FarCry2Startup", startupStage.get());
-                    android.util.Log.i("FarCry2X11", "STARTUP: " + startupStage.get());
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
             }
             catch (Throwable error) {
                 android.util.Log.e("FarCry2Startup", "Winlator startup failed at stage: " + startupStage.get(), error);
-                android.util.Log.i("FarCry2X11", "STARTUP ERROR at " + startupStage.get() + ": " + error.getClass().getName() + ": " + String.valueOf(error.getMessage()));
+                com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP ERROR at " + startupStage.get() + ": " + error.getClass().getName() + ": " + String.valueOf(error.getMessage()));
                 runOnUiThread(() -> {
                     String detail = "Этап: " + startupStage.get() + "\\n" + error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage());
                     new AlertDialog.Builder(this)
@@ -365,7 +365,7 @@ first_window_old = """                    preloaderDialog.closeOnUiThread();
 first_window_new = """                    preloaderDialog.closeOnUiThread();
                     startupFinished.set(true);
                     android.util.Log.i("FarCry2Startup", "First renderable X11 window appeared; startup complete");
-                    android.util.Log.i("FarCry2X11", "STARTUP COMPLETE: first renderable X11 window appeared");
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP COMPLETE: first renderable X11 window appeared");
                     flags[0] = true;"""
 if first_window_old not in s:
     raise SystemExit("First X11 window hook not found")
@@ -384,14 +384,14 @@ old = """        connector = new XConnectorEpoll(socketConfig, new XClientConnec
         connector.setInitialOutputBufferCapacity(4096);
         connector.setCanReceiveAncillaryMessages(true);
         connector.start();"""
-new = """        android.util.Log.i("FarCry2X11", "XSERVER BIND BEGIN path=" + socketConfig.path);
+new = """        com.winlator.core.ProcessHelper.appendDiagnosticLine("XSERVER BIND BEGIN path=" + socketConfig.path);
         connector = new XConnectorEpoll(socketConfig, new XClientConnectionHandler(xServer), new XClientRequestHandler());
-        android.util.Log.i("FarCry2X11", "XSERVER NATIVE SOCKET ALLOCATED path=" + socketConfig.path + " exists=" + new java.io.File(socketConfig.path).exists());
+        com.winlator.core.ProcessHelper.appendDiagnosticLine("XSERVER NATIVE SOCKET ALLOCATED path=" + socketConfig.path + " exists=" + new java.io.File(socketConfig.path).exists());
         connector.setInitialInputBufferCapacity(4096);
         connector.setInitialOutputBufferCapacity(4096);
         connector.setCanReceiveAncillaryMessages(true);
         connector.start();
-        android.util.Log.i("FarCry2X11", "XSERVER EPOLL STARTED path=" + socketConfig.path + " exists=" + new java.io.File(socketConfig.path).exists());"""
+        com.winlator.core.ProcessHelper.appendDiagnosticLine("XSERVER EPOLL STARTED path=" + socketConfig.path + " exists=" + new java.io.File(socketConfig.path).exists());"""
 if old not in s: raise SystemExit("XServerComponent.start marker missing")
 xserver.write_text(s.replace(old, new, 1))
 guest = Path(sys.argv[2])
