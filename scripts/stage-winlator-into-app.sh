@@ -663,11 +663,16 @@ allocate_new = """static XConnectorEpoll* XConnectorEpoll_allocate(JNIEnv* env, 
         *failureStage = "register filesystem X11 socket in epoll"; goto error;
     }
 
-    connector->abstractServerFd = createAbstractX11Socket(sockPath);
-    if (connector->abstractServerFd < 0) { *failureStage = "abstract X11 socket bind/listen"; goto error; }
+    // Only the X11 listener needs an abstract AF_UNIX alias. Other Winlator
+    // connectors (SysVSHM, VirGL, Vortek, ALSA, PulseAudio) have their own
+    // filesystem sockets and must not all contend for the same abstract X11 name.
+    if (sockPath && strstr(sockPath, "/tmp/.X11-unix/") != NULL) {
+        connector->abstractServerFd = createAbstractX11Socket(sockPath);
+        if (connector->abstractServerFd < 0) { *failureStage = "abstract X11 socket bind/listen"; goto error; }
 
-    if (!addFdToEpoll(connector->epollFd, connector->abstractServerFd, &connector->abstractServerFd)) {
-        *failureStage = "register abstract X11 socket in epoll"; goto error;
+        if (!addFdToEpoll(connector->epollFd, connector->abstractServerFd, &connector->abstractServerFd)) {
+            *failureStage = "register abstract X11 socket in epoll"; goto error;
+        }
     }
 
     connector->shutdownFd = eventfd(0, EFD_NONBLOCK);
