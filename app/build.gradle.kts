@@ -11,7 +11,10 @@ android {
     defaultConfig {
         applicationId = "com.farcry2.mobile"
         minSdk = 26
-        targetSdk = 35
+        // Android 10's SELinux policy permits Wine's required execmod operation
+        // for legacy-targeted apps (<=28); newer targets are denied when Wine
+        // maps and relocates PE images such as ntdll.dll.
+        targetSdk = 28
         versionCode = 10
         versionName = "0.10.0-runtime-host"
         ndk { abiFilters += listOf("arm64-v8a") }
