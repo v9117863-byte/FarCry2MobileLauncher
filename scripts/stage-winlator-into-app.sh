@@ -10,31 +10,20 @@ fi
 mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
-# Isolate this app's X server from other Android apps using the conventional :0 socket.
-python3 - "$APP/java/com/winlator/xconnector/UnixSocketConfig.java" "$APP/java/com/winlator/XServerDisplayActivity.java" "$APP/java/com/winlator/xenvironment/components/GuestProgramLauncherComponent.java" <<'PY'
+# Keep the conventional X11 display :0. Winlator's Android X11 bridge and
+# Box64's wrapped libX11 use the standard X0 abstract socket; a per-process
+# display number is not required because only one session runs in this app.
+python3 - "$APP/java/com/winlator/xconnector/UnixSocketConfig.java" <<'PY'
 from pathlib import Path
 import sys
-config, activity, guest = map(Path, sys.argv[1:])
-s = config.read_text()
+p = Path(sys.argv[1])
+s = p.read_text()
 old = '    public static final String XSERVER_PATH = "/tmp/.X11-unix/X0";'
-new = """    public static String XSERVER_PATH = "/tmp/.X11-unix/X0";
-    public static String XSERVER_DISPLAY = ":0";
-    public static void configureUniqueXServer() {
-        int display = android.os.Process.myPid() % 60000;
-        if (display == 0) display = 1;
-        XSERVER_PATH = "/tmp/.X11-unix/X" + display;
-        XSERVER_DISPLAY = ":" + display;
-    }"""
-if old not in s: raise SystemExit("UnixSocketConfig XSERVER_PATH declaration missing")
-config.write_text(s.replace(old, new, 1))
-s = activity.read_text()
-old = "        super.onCreate(savedInstanceState);"
-new = old + "\n        UnixSocketConfig.configureUniqueXServer();"
-if old not in s: raise SystemExit("XServerDisplayActivity onCreate marker missing")
-activity.write_text(s.replace(old, new, 1))
-s = guest.read_text()
-# DISPLAY is patched together with the diagnostic setup below.
-guest.write_text(s)
+new = old + '\\n    public static final String XSERVER_DISPLAY = ":0";'
+if "XSERVER_DISPLAY" not in s:
+    if old not in s: raise SystemExit("UnixSocketConfig XSERVER_PATH declaration missing")
+    s = s.replace(old, new, 1)
+p.write_text(s)
 PY
 # Persist subprocess output directly; upstream LogView only writes when its UI stream is usable.
 python3 - "$APP/java/com/winlator/core/ProcessHelper.java" <<'PY'
