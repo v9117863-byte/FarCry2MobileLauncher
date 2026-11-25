@@ -457,14 +457,25 @@ if "import android.net.LocalSocket;" not in s:
     s = s.replace("import android.content.Context;", imports + "import android.content.Context;", 1)
 await_method = """    private void awaitXServerSocket() {
         String socketName = UnixSocketConfig.XSERVER_PATH;
-        long deadline = SystemClock.elapsedRealtime() + 5000L;
+        long deadline = SystemClock.elapsedRealtime() + 10000L;
         String lastError = "not attempted";
         while (SystemClock.elapsedRealtime() < deadline) {
             LocalSocket probe = new LocalSocket();
             try {
                 probe.connect(new LocalSocketAddress(socketName, LocalSocketAddress.Namespace.ABSTRACT));
-                ProcessHelper.appendDiagnosticLine("XSERVER ABSTRACT SOCKET READY name=@" + socketName);
-                return;
+                probe.setSoTimeout(1500);
+                // Send a real X11 setup request (little-endian, protocol 11.0,
+                // no authentication). A successful TCP/Unix connect alone does
+                // not prove that the X server event loop can process requests.
+                byte[] setupRequest = new byte[] { 'l', 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+                probe.getOutputStream().write(setupRequest);
+                probe.getOutputStream().flush();
+                int status = probe.getInputStream().read();
+                if (status == 1) {
+                    ProcessHelper.appendDiagnosticLine("XSERVER X11 HANDSHAKE READY display=" + UnixSocketConfig.XSERVER_DISPLAY + " socket=@" + socketName);
+                    return;
+                }
+                lastError = status < 0 ? "server closed before X11 setup reply" : "X11 setup rejected with status=" + status;
             }
             catch (Exception error) {
                 lastError = error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage());
@@ -472,10 +483,10 @@ await_method = """    private void awaitXServerSocket() {
             finally {
                 try { probe.close(); } catch (Exception ignored) {}
             }
-            SystemClock.sleep(50L);
+            SystemClock.sleep(100L);
         }
-        ProcessHelper.appendDiagnosticLine("XSERVER ABSTRACT SOCKET NOT READY name=@" + socketName + " lastError=" + lastError);
-        throw new IllegalStateException("XServer не принимает подключения через Android abstract socket: " + lastError);
+        ProcessHelper.appendDiagnosticLine("XSERVER X11 HANDSHAKE FAILED display=" + UnixSocketConfig.XSERVER_DISPLAY + " socket=@" + socketName + " lastError=" + lastError);
+        throw new IllegalStateException("XServer не прошёл проверку протокола X11: " + lastError);
     }
 
 """
