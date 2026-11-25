@@ -72,6 +72,7 @@ class MainActivity : Activity() {
         })
         setContentView(nativeUi!!.root)
         nativeUi!!.refreshStatus()
+        if (intent.getBooleanExtra("show_pause_menu", false)) nativeUi!!.showPauseMenu()
     }
 
     // Wine's Winlator build hardcodes the original package path. Redirect that
