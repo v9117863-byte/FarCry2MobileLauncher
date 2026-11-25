@@ -42,6 +42,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
     private lateinit var status: TextView
     private lateinit var gameState: TextView
     private lateinit var runtimeState: TextView
+    private lateinit var importGameButton: TextView
     private var currentPage = "home"
     val root: View
 
@@ -144,10 +145,12 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
     private fun showHome() {
         currentPage = "home"
         heading("FIELD OPERATIONS", "AFRICA  /  SINGLE PLAYER")
-        body.addView(button("Импортировать игру") {
+        val initialGameState = try { JSONObject(actions.gameStatus()) } catch (_: Exception) { JSONObject() }
+        importGameButton = button("Импортировать игру") {
             val state = try { JSONObject(actions.gameStatus()) } catch (_: Exception) { JSONObject() }
             if (state.optBoolean("folderSelected")) actions.importGameFiles() else actions.chooseGameFolder()
-        })
+        }.apply { visibility = if (initialGameState.optBoolean("imported")) View.GONE else View.VISIBLE }
+        body.addView(importGameButton)
         body.addView(button("▶   Запустить игру", true) {
             val result = try { JSONObject(actions.launch()) } catch (_: Exception) { JSONObject() }
             message(result.optString("message", "Запрос запуска отправлен"))
@@ -185,8 +188,11 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         section("Установка Far Cry 2")
         gameState = text("Проверка…", 12f, Color.WHITE)
         body.addView(gameState)
-        body.addView(button("Выбрать папку игры") { actions.chooseGameFolder() })
-        body.addView(button("Импортировать файлы") { actions.importGameFiles() })
+        val installed = try { JSONObject(actions.gameStatus()).optBoolean("imported") } catch (_: Exception) { false }
+        if (!installed) {
+            body.addView(button("Выбрать папку игры") { actions.chooseGameFolder() })
+            body.addView(button("Импортировать файлы") { actions.importGameFiles() })
+        }
         body.addView(button("Проверить ещё раз") { refreshStatus() })
         body.addView(button("Назад") { showPauseMenu() })
         refreshStatus()
@@ -255,11 +261,15 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         if (::gameState.isInitialized) {
             try {
                 val g = JSONObject(actions.gameStatus())
+                val installed = g.optBoolean("imported")
                 gameState.text = when {
-                    g.optBoolean("imported") -> "Игра импортирована и готова"
+                    installed -> "Игра импортирована и готова"
                     g.optBoolean("exeFound") -> "FarCry2.exe найден — требуется импорт"
                     g.optBoolean("folderSelected") -> "Папка выбрана, EXE не найден"
                     else -> "Папка игры не выбрана"
+                }
+                if (::importGameButton.isInitialized) {
+                    importGameButton.visibility = if (installed) View.GONE else View.VISIBLE
                 }
             } catch (_: Exception) { gameState.text = "Не удалось проверить игровые файлы" }
         }
