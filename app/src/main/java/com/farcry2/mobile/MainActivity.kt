@@ -443,8 +443,23 @@ class MainActivity : Activity() {
                     }
                     winlatorPrefs.edit().putString("current_box64_version", requestedBox64Version).apply()
                     appendLaunchLog("BOX64 INSTALL OK bytes=" + box64Binary.length() + " path=" + box64Binary.absolutePath)
-                    restoreRootFSExecutePermissions(rootDir)
-                    patchWineRootfsPath(rootDir)
+                    // The first preparation repairs executable bits and patches two Wine
+                    // binaries. Both operations scan large files, so cache the result and
+                    // only repeat them after a fresh RootFS install or if a key binary is missing.
+                    val preparedMarker = File(rootDir, ".fc2-runtime-prepared-v1")
+                    val wineServer = File(rootDir, "opt/wine/bin/wineserver")
+                    val ntdll = File(rootDir, "opt/wine/lib/wine/x86_64-unix/ntdll.so")
+                    val runtimeNeedsPreparation = !preparedMarker.isFile ||
+                        !box64Binary.canExecute() || !wineServer.canExecute() || !ntdll.canRead()
+                    if (runtimeNeedsPreparation) {
+                        reportGameProgress(78, "Однократная настройка игровых компонентов")
+                        restoreRootFSExecutePermissions(rootDir)
+                        patchWineRootfsPath(rootDir)
+                        preparedMarker.writeText("prepared-v1")
+                        appendLaunchLog("RUNTIME_PREPARATION complete; cached for next launch")
+                    } else {
+                        appendLaunchLog("RUNTIME_PREPARATION skipped; cached installation is ready")
+                    }
                     reportGameProgress(84, "Настраиваю игровую среду")
                     runOnUiThread {
                         try {
