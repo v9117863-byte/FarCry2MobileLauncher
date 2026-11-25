@@ -812,6 +812,27 @@ s = s.replace(jni_old, jni_new, 1)
 
 p.write_text(s)
 PY
+# Keep the X11 event loop alive when Android delivers an interrupting signal.
+# The upstream loop treated every EINTR as a fatal server exit, which can leave
+# Wine running with a loaded winex11 driver but no display to connect to.
+python3 - "$APP/cpp/winlator/src/xconnector_epoll.c" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = """        int numFds = epoll_wait(connector->epollFd, events, MAX_EVENTS, -1);
+        if (numFds < 0) break;"""
+new = """        int numFds = epoll_wait(connector->epollFd, events, MAX_EVENTS, -1);
+        if (numFds < 0) {
+            if (errno == EINTR) continue;
+            __android_log_print(ANDROID_LOG_ERROR, "FarCry2X11",
+                "X11 epoll loop stopped: epoll_wait errno=%d (%s)", errno, strerror(errno));
+            break;
+        }"""
+if old not in s:
+    raise SystemExit("X11 epoll_wait loop marker not found")
+p.write_text(s.replace(old, new, 1))
+PY
 if [[ -d "$UPSTREAM/app/src/main/jniLibs" ]]; then
   mkdir -p "$APP/jniLibs"
   cp -a "$UPSTREAM/app/src/main/jniLibs/." "$APP/jniLibs/"
