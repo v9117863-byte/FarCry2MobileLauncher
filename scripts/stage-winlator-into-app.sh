@@ -583,6 +583,9 @@ allocate_old = """static XConnectorEpoll* XConnectorEpoll_allocate(JNIEnv* env, 
     connector->serverFd = createServerSocket(sockPath);
     if (connector->serverFd < 0) goto error;
 
+    connector->shutdownFd = eventfd(0, EFD_NONBLOCK);
+    if (connector->shutdownFd < 0) goto error;
+
     if (!addFdToEpoll(connector->epollFd, connector->serverFd, &connector->serverFd)) goto error;
 
     connector->abstractServerFd = createAbstractX11Socket(sockPath);
@@ -592,9 +595,6 @@ allocate_old = """static XConnectorEpoll* XConnectorEpoll_allocate(JNIEnv* env, 
             "Failed to register abstract X11 socket in epoll: %s", strerror(errno));
         goto error;
     }
-
-    connector->shutdownFd = eventfd(0, EFD_NONBLOCK);
-    if (connector->shutdownFd < 0) goto error;
 
     if (!addFdToEpoll(connector->epollFd, connector->shutdownFd, &connector->shutdownFd)) goto error;
 
