@@ -76,6 +76,7 @@ class MainActivity : Activity() {
             webChromeClient = WebChromeClient()
             addJavascriptInterface(AndroidBridge(), "AndroidDevice")
         }
+        com.winlator.core.ProcessHelper.setNativeLibraryDir(applicationInfo.nativeLibraryDir)
         setContentView(web)
         web.loadUrl("file:///android_asset/index.html")
     }
