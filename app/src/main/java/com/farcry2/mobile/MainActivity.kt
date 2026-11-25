@@ -511,6 +511,37 @@ class MainActivity : Activity() {
                 driveMap.append("F:").append(gameDir.absolutePath)
                 container.setDrives(driveMap.toString())
                 container.setScreenSize(resolveRequestedScreenSize())
+                // Far Cry 2 reads its renderer from GamerProfile.xml; seed DX9 before its first run.
+                val fc2ProfileDir = File(container.getUserDir(), "Documents/My Games/Far Cry 2")
+                if (!fc2ProfileDir.isDirectory && !fc2ProfileDir.mkdirs()) {
+                    throw IllegalStateException("Не удалось создать папку настроек Far Cry 2")
+                }
+                val fc2Profile = File(fc2ProfileDir, "GamerProfile.xml")
+                val profileResolution = container.getScreenSize().split("x")
+                val profileWidth = profileResolution.getOrNull(0)?.toIntOrNull() ?: 960
+                val profileHeight = profileResolution.getOrNull(1)?.toIntOrNull() ?: 540
+                if (!fc2Profile.isFile) {
+                    fc2Profile.writeText(
+                        """<GamerProfile>
+<SoundProfile MusicEnabled="1" MasterVolume="100"/>
+<RenderProfile MultiSampleMode="0" AlphaToCoverage="0" ResolutionX="$profileWidth" ResolutionY="$profileHeight" Quality="custom" Fullscreen="0" Maximized="0" ForceWidescreen="1" AspectRatio="0" VSync="0" RefreshRate="60" DisableMip0Loading="0" MaxDriverBufferedFrames="0" Platform="d3d9" ShowFPS="0" ClustersZPassMaxLOD="1" Brightness="1" Contrast="1" GammaRamp="1" GammaRampR="1" GammaRampG="1" GammaRampB="1" AllowAsynchShaderLoading="1">
+<CustomQuality><quality ResolutionX="$profileWidth" ResolutionY="$profileHeight" EnvironmentQuality="low" AntiPortalQuality="high" PostFxQuality="low" TextureQuality="low" TextureResolutionQuality="low" WaterQuality="low" DepthPassQuality="high" VegetationQuality="low" TerrainQuality="low" GeometryQuality="low" AmbientQuality="low" ShadowQuality="off" Hdr="0" HdrFP32="0" Bloom="0" id="custom"/></CustomQuality>
+</RenderProfile>
+<NetworkProfile CustomMapMaxUploadRateOnline="10240" OnlineEnginePort="9000" OnlineServicePort="9001" FileTransferHostPort="9002" FileTransferClientPort="9003" LanBroadcastPort="9004" ScanFreePorts="1" ScanPortRange="1000" ScanPortStart="9000" SessionProvider="" DetectPublicAddress="1" MaxUploadOnline="768"><Accounts/></NetworkProfile>
+<GameProfile Sensitivity="1" Invert_y="0" UseMouseSmooth="0" Smoothness="1" Smoothness_Ironsight="1" HelpCrosshair="0" UseCompassMiniMap="1" UseRoadSignHilight="1" UseSubtitles="1" UseAmbx="0" Autosave="1" Machete="0" DifficultyLevel="1" ClanTag=""><FireConfig QualitySetting="VeryHigh"/></GameProfile>
+<RealTreeProfile Quality="VeryHigh"><CustomQuality/></RealTreeProfile>
+<EngineProfile><PhysicConfig QualitySetting="VeryHigh"/><QcConfig GatherFPS="1" GatherAICnt="1" IsQcTester="0"/><InputConfig/></EngineProfile>
+</GamerProfile>"""
+                    )
+                } else {
+                    val oldProfile = fc2Profile.readText()
+                    val forcedDx9Profile = oldProfile.replace(
+                        Regex("Platform=\\"[^\\"]*\\""),
+                        "Platform=\\"d3d9\\""
+                    )
+                    if (forcedDx9Profile != oldProfile) fc2Profile.writeText(forcedDx9Profile)
+                }
+                appendLaunchLog("FC2_PROFILE path=" + fc2Profile.absolutePath + " platform=d3d9 size=" + profileWidth + "x" + profileHeight)
                 // Apply the graphics choice from the launcher. Previously the UI saved
                 // this preference but the Winlator container kept its default Vortek
                 // Vulkan driver, so the visible "Turnip" selection had no effect.
