@@ -10,6 +10,34 @@ fi
 mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
+# Isolate this app's X server from other Android apps using the conventional :0 socket.
+python3 - "$APP/java/com/winlator/xconnector/UnixSocketConfig.java" "$APP/java/com/winlator/XServerDisplayActivity.java" "$APP/java/com/winlator/xenvironment/components/GuestProgramLauncherComponent.java" <<'PY'
+from pathlib import Path
+import sys
+config, activity, guest = map(Path, sys.argv[1:])
+s = config.read_text()
+old = '    public static final String XSERVER_PATH = "/tmp/.X11-unix/X0";'
+new = """    public static String XSERVER_PATH = "/tmp/.X11-unix/X0";
+    public static String XSERVER_DISPLAY = ":0";
+    public static void configureUniqueXServer() {
+        int display = android.os.Process.myPid() % 60000;
+        if (display == 0) display = 1;
+        XSERVER_PATH = "/tmp/.X11-unix/X" + display;
+        XSERVER_DISPLAY = ":" + display;
+    }"""
+if old not in s: raise SystemExit("UnixSocketConfig XSERVER_PATH declaration missing")
+config.write_text(s.replace(old, new, 1))
+s = activity.read_text()
+old = "        super.onCreate(savedInstanceState);"
+new = old + "\n        UnixSocketConfig.configureUniqueXServer();"
+if old not in s: raise SystemExit("XServerDisplayActivity onCreate marker missing")
+activity.write_text(s.replace(old, new, 1))
+s = guest.read_text()
+old = '        envVars.put("DISPLAY", UnixSocketConfig.XSERVER_DISPLAY);'
+new = '        envVars.put("DISPLAY", UnixSocketConfig.XSERVER_DISPLAY);'
+if old not in s: raise SystemExit("Guest DISPLAY assignment missing")
+guest.write_text(s.replace(old, new, 1))
+PY
 # Persist subprocess output directly; upstream LogView only writes when its UI stream is usable.
 python3 - "$APP/java/com/winlator/core/ProcessHelper.java" <<'PY'
 from pathlib import Path
@@ -400,7 +428,7 @@ old = """        envVars.put("DISPLAY", ":0");
         envVars.put("PATH", rootDir+rootFS.getWinePath()+"/bin:"+rootDir+"/usr/local/bin:"+rootDir+"/usr/bin");"""
 new = """        envVars.put("DISPLAY", ":0");
         File x11Socket = new File(rootDir, UnixSocketConfig.XSERVER_PATH);
-        ProcessHelper.appendDiagnosticLine("WINE DISPLAY CONFIG DISPLAY=:0 X11_SOCKET=" + x11Socket.getAbsolutePath() + " exists=" + x11Socket.exists() + " canRead=" + x11Socket.canRead() + " canWrite=" + x11Socket.canWrite());
+        ProcessHelper.appendDiagnosticLine("WINE DISPLAY CONFIG DISPLAY=" + UnixSocketConfig.XSERVER_DISPLAY + " X11_SOCKET=" + x11Socket.getAbsolutePath() + " exists=" + x11Socket.exists() + " canRead=" + x11Socket.canRead() + " canWrite=" + x11Socket.canWrite());
         File fontConfig = new File(rootDir, "/etc/fonts/fonts.conf");
         if (fontConfig.isFile()) {
             envVars.put("FONTCONFIG_FILE", fontConfig.getAbsolutePath());
@@ -487,8 +515,15 @@ helper = """static int createAbstractX11Socket(const char* sockPath) {
 
     struct sockaddr_un address = {0};
     address.sun_family = AF_UNIX;
-    const char* displayPath = "/tmp/.X11-unix/X0";
+    char displayPath[sizeof(address.sun_path)];
+    const char* marker = sockPath ? strstr(sockPath, "/tmp/.X11-unix/") : NULL;
+    if (marker) snprintf(displayPath, sizeof(displayPath), "%s", marker);
+    else snprintf(displayPath, sizeof(displayPath), "%s", "/tmp/.X11-unix/X0");
     size_t pathLength = strlen(displayPath);
+    if (pathLength + 1 > sizeof(address.sun_path)) {
+        errno = ENAMETOOLONG;
+        goto error;
+    }
     address.sun_path[0] = '\\0';
     memcpy(address.sun_path + 1, displayPath, pathLength);
 
