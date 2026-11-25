@@ -3,6 +3,10 @@ package com.farcry2.mobile
 import android.app.Activity
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.os.Handler
+import android.os.Looper
 import android.view.*
 import android.widget.*
 import org.json.JSONObject
@@ -31,6 +35,8 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
     private val gold = Color.rgb(196, 157, 86)
     private val muted = Color.rgb(213, 216, 192)
     private lateinit var body: LinearLayout
+    private val clickTone = ToneGenerator(AudioManager.STREAM_SYSTEM, 38)
+    private val soundHandler = Handler(Looper.getMainLooper())
     private lateinit var status: TextView
     private lateinit var gameState: TextView
     private lateinit var runtimeState: TextView
@@ -41,13 +47,24 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         val frame = FrameLayout(activity)
         frame.addView(SceneBackdrop(activity), FrameLayout.LayoutParams(-1, -1))
         val row = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL }
-        val panel = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(18), dp(22), dp(18))
+        val panel = FrameLayout(activity).apply {
             background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.rgb(174, 190, 148), Color.rgb(125, 145, 111)))
+                intArrayOf(Color.rgb(67, 78, 61), Color.rgb(27, 36, 31))).apply {
+                setStroke(dp(1), Color.argb(120, 218, 197, 143))
+            }
         }
-        val panelParams = LinearLayout.LayoutParams(0, -1, 0.34f)
+        val scroll = ScrollView(activity).apply {
+            isFillViewport = true
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            clipToPadding = false
+            setPadding(dp(22), dp(18), dp(22), dp(18))
+            isVerticalScrollBarEnabled = true
+            scrollBarStyle = View.SCROLLBARS_INSIDE_INSET
+        }
+        val content = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+        scroll.addView(content, ScrollView.LayoutParams(-1, -2))
+        panel.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+        val panelParams = LinearLayout.LayoutParams(0, -1, 0.38f)
         row.addView(panel, panelParams)
         val right = FrameLayout(activity)
         right.addView(TextView(activity).apply {
@@ -60,9 +77,16 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         }, FrameLayout.LayoutParams(-1, -1))
         row.addView(right, LinearLayout.LayoutParams(0, -1, 0.66f))
         frame.addView(row, FrameLayout.LayoutParams(-1, -1))
-        body = panel
+        body = content
         root = frame
         showHome()
+    }
+
+    private fun playClick() {
+        try {
+            clickTone.startTone(ToneGenerator.TONE_PROP_ACK, 48)
+            soundHandler.postDelayed({ try { clickTone.stopTone() } catch (_: Exception) {} }, 65L)
+        } catch (_: Exception) {}
     }
 
     private fun dp(v: Int) = (v * activity.resources.displayMetrics.density).toInt()
@@ -87,7 +111,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             }
             isClickable = true
             isFocusable = true
-            setOnClickListener { onClick() }
+            setOnClickListener { playClick(); onClick() }
             val p = LinearLayout.LayoutParams(-1, dp(46))
             p.topMargin = dp(2)
             layoutParams = p
@@ -248,38 +272,58 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
     }
 
     private class SceneBackdrop(context: Activity) : View(context) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val p = Paint(Paint.ANTI_ALIAS_FLAG)
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
-            val w = width.toFloat(); val h = height.toFloat()
-            paint.shader = LinearGradient(0f, 0f, 0f, h,
-                Color.rgb(104, 183, 184), Color.rgb(36, 77, 67), Shader.TileMode.CLAMP)
-            canvas.drawRect(0f, 0f, w, h, paint)
-            paint.shader = null
-            // Layered, original savannah ridges and dry grass silhouettes.
-            val ridge = Path().apply {
-                moveTo(0f, h * .56f); lineTo(w * .13f, h * .38f); lineTo(w * .29f, h * .53f)
-                lineTo(w * .47f, h * .31f); lineTo(w * .65f, h * .49f)
-                lineTo(w * .82f, h * .34f); lineTo(w, h * .52f); lineTo(w, h); lineTo(0f, h); close()
+            val w = width.toFloat().coerceAtLeast(1f)
+            val h = height.toFloat().coerceAtLeast(1f)
+            p.shader = LinearGradient(0f, 0f, 0f, h,
+                intArrayOf(Color.rgb(54, 102, 112), Color.rgb(190, 157, 111),
+                    Color.rgb(215, 177, 119), Color.rgb(73, 76, 54)),
+                floatArrayOf(0f, .38f, .62f, 1f), Shader.TileMode.CLAMP)
+            canvas.drawRect(0f, 0f, w, h, p); p.shader = null
+            // Hazy African sunset.
+            p.color = Color.argb(155, 244, 202, 135)
+            canvas.drawCircle(w * .72f, h * .29f, h * .105f, p)
+            p.color = Color.argb(30, 255, 230, 185)
+            canvas.drawCircle(w * .72f, h * .29f, h * .15f, p)
+            val far = Path().apply {
+                moveTo(0f,h*.57f); lineTo(w*.12f,h*.43f); lineTo(w*.23f,h*.51f)
+                lineTo(w*.39f,h*.37f); lineTo(w*.53f,h*.52f); lineTo(w*.7f,h*.4f)
+                lineTo(w*.84f,h*.5f); lineTo(w,h*.39f); lineTo(w,h); lineTo(0f,h); close()
             }
-            paint.color = Color.rgb(48, 88, 73); canvas.drawPath(ridge, paint)
-            val ground = Path().apply {
-                moveTo(0f, h * .73f); lineTo(w * .2f, h * .62f); lineTo(w * .42f, h * .72f)
-                lineTo(w * .7f, h * .58f); lineTo(w, h * .69f); lineTo(w, h); lineTo(0f, h); close()
+            p.color = Color.rgb(87, 99, 77); canvas.drawPath(far,p)
+            val mid = Path().apply {
+                moveTo(0f,h*.69f); lineTo(w*.16f,h*.59f); lineTo(w*.31f,h*.66f)
+                lineTo(w*.49f,h*.55f); lineTo(w*.67f,h*.68f); lineTo(w*.85f,h*.56f)
+                lineTo(w,h*.64f); lineTo(w,h); lineTo(0f,h); close()
             }
-            paint.color = Color.rgb(117, 119, 76); canvas.drawPath(ground, paint)
-            paint.color = Color.argb(90, 25, 39, 32)
-            for (i in 0..28) {
-                val x = (i * 73 % width.coerceAtLeast(1)).toFloat()
-                val y = h * (.72f + (i % 7) * .035f)
-                canvas.drawLine(x, y, x + 10f, y - 26f - (i % 5) * 5f, paint)
+            p.color = Color.rgb(83, 77, 52); canvas.drawPath(mid,p)
+            p.color = Color.rgb(48, 48, 34)
+            canvas.drawRect(0f,h*.83f,w,h,p)
+            // Acacia silhouettes and dry grass.
+            for (i in 0..5) {
+                val x = w * (i / 5f) + (i % 2) * 19f
+                val base = h * (.84f + (i % 3) * .035f)
+                val trunk = (h * .12f).coerceAtLeast(25f)
+                p.strokeWidth = (w * .0025f).coerceAtLeast(2f)
+                p.color = Color.rgb(39, 43, 31)
+                canvas.drawLine(x,base,x-3f,base-trunk,p)
+                p.style = Paint.Style.FILL
+                p.color = Color.rgb(43, 48, 34)
+                canvas.drawOval(x-w*.045f,base-trunk-h*.035f,x+w*.045f,base-trunk+h*.005f,p)
             }
-            paint.color = Color.argb(38, 255, 244, 206)
-            for (i in 0..90) {
-                val x = (i * 47 % width.coerceAtLeast(1)).toFloat()
-                val y = (i * 83 % height.coerceAtLeast(1)).toFloat()
-                canvas.drawCircle(x, y, if (i % 3 == 0) 2f else 1f, paint)
+            p.color = Color.argb(38,255,239,205)
+            for (i in 0..130) {
+                val x = (i * 67 % width.coerceAtLeast(1)).toFloat()
+                val y = (i * 97 % height.coerceAtLeast(1)).toFloat()
+                canvas.drawCircle(x,y,if(i%4==0) 1.8f else .8f,p)
             }
+            // Darken the right edge for legible title artwork.
+            p.shader = LinearGradient(w*.45f,0f,w,h,
+                intArrayOf(Color.TRANSPARENT,Color.argb(125,12,19,17)),Shader.TileMode.CLAMP)
+            canvas.drawRect(w*.45f,0f,w,h,p); p.shader = null
         }
     }
+}
 }
