@@ -505,7 +505,11 @@ class MainActivity : Activity() {
                 launchingGame = false
                 appendLaunchLog("START_ACTIVITY containerId=${container.id}, exe=${gameExe.absolutePath}")
                 reportGameProgress(98, "Передаю FarCry2.exe игровой системе")
-                reportGameLaunch(true, "Игровая сессия готова. Запускаю Far Cry 2.")
+                // Opening XServerDisplayActivity only confirms that Android accepted
+                // the activity request. It does NOT prove that Wine or Far Cry 2
+                // created a game window, so keep the UI in a pending state.
+                reportGameProgress(95, "Окно запуска открыто. Ожидание окна Far Cry 2…")
+                appendLaunchLog("START_ACTIVITY accepted; waiting for Wine/X11 game-window confirmation")
                 startActivity(intent)
             } catch (e: Exception) {
                 launchingGame = false
