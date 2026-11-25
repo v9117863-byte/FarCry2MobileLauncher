@@ -228,6 +228,24 @@ oncreate = "        super.onCreate(savedInstanceState);"
 if "activeInstance = this;" not in s:
     if oncreate not in s: raise SystemExit("XServer onCreate marker not found")
     s = s.replace(oncreate, oncreate + "\n        activeInstance = this;", 1)
+# Hardware Back in the game opens the launcher's native pause menu as a new Activity.
+# The launcher is deliberately stacked above XServer; Continue finishes it and reveals the game again.
+if 'show_pause_menu' not in s:
+    back_handler = """
+    @Override
+    public void onBackPressed() {
+        if (activeInstance == this && !isFinishing()) {
+            android.content.Intent pauseIntent = new android.content.Intent(
+                this, com.farcry2.mobile.MainActivity.class);
+            pauseIntent.putExtra("show_pause_menu", true);
+            startActivity(pauseIntent);
+        }
+        else super.onBackPressed();
+    }
+"""
+    marker = "    private static volatile XServerDisplayActivity activeInstance;"
+    if marker not in s: raise SystemExit("XServer active-session marker not found")
+    s = s.replace(marker, back_handler + "\\n" + marker, 1)
 destroy_old = """    protected void onDestroy() {
         winHandler.stop();"""
 destroy_new = """    protected void onDestroy() {
