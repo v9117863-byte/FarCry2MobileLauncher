@@ -174,12 +174,16 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
             createDebugThread(process.getInputStream());
             createDebugThread(process.getErrorStream());
             try {
-                pid = (int) process.pid();
+                Field pidField = process.getClass().getDeclaredField("pid");
+                pidField.setAccessible(true);
+                pid = pidField.getInt(process);
                 appendDiagnosticLine("PROCESS PID=" + pid);
+                try { pidField.setAccessible(false); } catch (Exception ignored) {}
             }
-            catch (Throwable pidError) {
-                appendDiagnosticLine("PID LOOKUP FAILED: " + pidError.getClass().getName() + ": " + String.valueOf(pidError.getMessage()));
-                throw new java.io.IOException("Не удалось получить PID процесса Box64", pidError);
+            catch (Exception pidError) {
+                // ProcessBuilder.start() already succeeded. PID reflection is only
+                // diagnostic and must never turn a live process into a launch failure.
+                appendDiagnosticLine("PID LOOKUP UNAVAILABLE (process was started): " + pidError.getClass().getName() + ": " + String.valueOf(pidError.getMessage()));
             }
             if (terminationCallback != null) createWaitForThread(process, terminationCallback);
         }
@@ -484,7 +488,7 @@ start_old = """            copyDefaultBox64RCFile();
 start_new = """            copyDefaultBox64RCFile();
             awaitXServerSocket();
             pid = execGuestProgram();
-            if (pid <= 0) throw new IllegalStateException("Box64 не запустился: ProcessHelper вернул PID " + pid + ". Открой «Скопировать отчёт» в лаунчере.");"""
+            ProcessHelper.appendDiagnosticLine("BOX64 EXEC REQUEST RETURNED pid=" + pid + " (negative PID means Android hid the PID field; inspect process output and exit callback)");"""
 if start_old not in s: raise SystemExit("GuestProgramLauncher.start insertion marker missing")
 s = s.replace(start_old, start_new, 1)
 old = """        envVars.put("DISPLAY", ":0");
