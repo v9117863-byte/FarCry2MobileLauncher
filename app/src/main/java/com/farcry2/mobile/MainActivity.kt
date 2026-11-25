@@ -89,7 +89,7 @@ class MainActivity : Activity() {
         check(oldPath.size == replacement.size) { "Wine path patch must preserve binary size" }
 
         val alias = File(filesDir.parentFile, "r")
-        if (alias.exists() || android.system.Os.readlinkOrNullCompat(alias.absolutePath) != null) {
+        if (alias.exists()) {
             check(alias.canonicalFile == rootDir.canonicalFile) {
                 "Wine RootFS alias already exists and points elsewhere: " + alias.absolutePath
             }
