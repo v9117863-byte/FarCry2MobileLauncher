@@ -205,7 +205,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         val resolution = spinner(listOf("480p", "540p", "600p", "720p", "Native"), "540p")
         body.addView(text("Разрешение игрового экрана", 12f, Color.WHITE)); body.addView(resolution)
         section("Графика")
-        val driver = spinner(listOf("Turnip", "VirGL", "Системный"), "Turnip")
+        val driver = spinner(listOf("Системный", "Turnip", "VirGL"), "Системный")
         body.addView(text("Графический драйвер", 12f, Color.WHITE)); body.addView(driver)
         val quality = spinner(listOf("Низкая", "Средняя", "Высокая"), "Низкая")
         body.addView(text("Профиль производительности", 12f, Color.WHITE)); body.addView(quality)
@@ -215,7 +215,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         body.addView(touch)
         body.addView(button("Сохранить настройки", true) {
             val json = JSONObject().put("resolution", resolution.selectedItem?.toString() ?: "540p")
-                .put("graphicsDriver", driver.selectedItem?.toString() ?: "Turnip")
+                .put("graphicsDriver", driver.selectedItem?.toString() ?: "Системный")
                 .put("performance", quality.selectedItem?.toString() ?: "Низкая")
                 .put("touchControls", touch.isChecked)
             actions.saveSettings(json.toString())
