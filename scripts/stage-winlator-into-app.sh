@@ -412,6 +412,51 @@ new = """        envVars.put("DISPLAY", ":0");
 if old not in s: raise SystemExit("Guest DISPLAY setup marker missing")
 guest.write_text(s.replace(old, new, 1))
 PY
+# Trace the actual Wine -> X11 connection, not merely socket-file creation.
+python3 - "$APP/java/com/winlator/xconnector/XConnectorEpoll.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+if "FC2_X11_CLIENT_CONNECTED" not in s:
+    old = """    private long nativePtr;
+
+    static {"""
+    new = """    private long nativePtr;
+    private final java.util.concurrent.atomic.AtomicBoolean firstClientLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
+    private final java.util.concurrent.atomic.AtomicBoolean firstRequestLogged = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    static {"""
+    if old not in s: raise SystemExit("XConnectorEpoll field marker missing")
+    s = s.replace(old, new, 1)
+    old = """        ConnectedClient client = connectionHandler.newConnectedClient(clientPtr, fd);
+        client.createInputStream(initialInputBufferCapacity);"""
+    new = """        ConnectedClient client = connectionHandler.newConnectedClient(clientPtr, fd);
+        if (firstClientLogged.compareAndSet(false, true))
+            com.winlator.core.ProcessHelper.appendDiagnosticLine("FC2_X11_CLIENT_CONNECTED fd=" + fd + " clientPtr=" + clientPtr);
+        client.createInputStream(initialInputBufferCapacity);"""
+    if old not in s: raise SystemExit("XConnectorEpoll new-client marker missing")
+    s = s.replace(old, new, 1)
+    old = """                if (inputStream.readMoreData(canReceiveAncillaryMessages) > 0) {
+                    int activePosition = 0;"""
+    new = """                int bytesRead = inputStream.readMoreData(canReceiveAncillaryMessages);
+                if (bytesRead > 0) {
+                    if (firstRequestLogged.compareAndSet(false, true))
+                        com.winlator.core.ProcessHelper.appendDiagnosticLine("FC2_X11_FIRST_REQUEST bytes=" + bytesRead + " fd=" + client.fd);
+                    int activePosition = 0;"""
+    if old not in s: raise SystemExit("XConnectorEpoll input marker missing")
+    s = s.replace(old, new, 1)
+    old = """        catch (IOException e) {
+            killConnection(client);
+        }"""
+    new = """        catch (IOException e) {
+            com.winlator.core.ProcessHelper.appendDiagnosticLine("FC2_X11_CLIENT_IO_ERROR fd=" + client.fd + " error=" + e.getClass().getName() + ": " + String.valueOf(e.getMessage()));
+            killConnection(client);
+        }"""
+    if old not in s: raise SystemExit("XConnectorEpoll IOException marker missing")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
 if [[ -d "$UPSTREAM/app/src/main/jniLibs" ]]; then
   mkdir -p "$APP/jniLibs"
