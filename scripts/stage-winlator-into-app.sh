@@ -79,7 +79,30 @@ exec_new = """    public static int exec(String command, EnvVars envVars, File w
         int pid = -1;
         appendDiagnosticLine("ProcessHelper.exec BEGIN: " + command);
         try {
-            ProcessBuilder processBuilder = (new ProcessBuilder(splitCommand(command))).directory(workingDir);"""
+            String[] commandArgs = splitCommand(command);
+            appendDiagnosticLine("PROCESS ARGUMENTS READY: argc=" + commandArgs.length + ", cwd=" + String.valueOf(workingDir));
+            ProcessBuilder processBuilder = (new ProcessBuilder(commandArgs)).directory(workingDir);
+            appendDiagnosticLine("PROCESS BUILDER READY");
+            if (envVars != null) {
+                for (String name : envVars) processBuilder.environment().put(name, envVars.get(name));
+            }
+            appendDiagnosticLine("PROCESS START CALL");
+            java.lang.Process process = processBuilder.start();
+            appendDiagnosticLine("PROCESS START RETURNED");
+            createDebugThread(process.getInputStream());
+            createDebugThread(process.getErrorStream());
+            try {
+                Field pidField = process.getClass().getDeclaredField("pid");
+                pidField.setAccessible(true);
+                pid = pidField.getInt(process);
+                appendDiagnosticLine("PROCESS PID=" + pid);
+                try { pidField.setAccessible(false); } catch (Exception ignored) {}
+            }
+            catch (Exception pidError) {
+                appendDiagnosticLine("PID LOOKUP FAILED (process may still be running): " + pidError.getClass().getName() + ": " + String.valueOf(pidError.getMessage()));
+            }
+            if (terminationCallback != null) createWaitForThread(process, terminationCallback);
+            return pid;"""
 if exec_old not in s: raise SystemExit("ProcessHelper exec start marker not found")
 s = s.replace(exec_old, exec_new, 1)
 started_old = """            Field pidField = process.getClass().getDeclaredField("pid");
@@ -110,7 +133,7 @@ match = re.search(pattern, s)
 if not match:
     raise SystemExit("ProcessHelper exec catch block not found (relaxed regex)")
 catch_new = """        }
-        catch (Exception e) {
+        catch (Throwable e) {
             appendDiagnosticLine("ProcessHelper.exec ERROR: " + e.getClass().getName() + ": " + String.valueOf(e.getMessage()));
             android.util.Log.e("FarCry2Diagnostics", "ProcessHelper.exec failed", e);
         }
