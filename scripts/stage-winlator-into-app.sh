@@ -245,7 +245,7 @@ if 'show_pause_menu' not in s:
 """
     marker = "    private static volatile XServerDisplayActivity activeInstance;"
     if marker not in s: raise SystemExit("XServer active-session marker not found")
-    s = s.replace(marker, back_handler + "\\n" + marker, 1)
+    s = s.replace(marker, back_handler + "\n" + marker, 1)
 destroy_old = """    protected void onDestroy() {
         winHandler.stop();"""
 destroy_new = """    protected void onDestroy() {
