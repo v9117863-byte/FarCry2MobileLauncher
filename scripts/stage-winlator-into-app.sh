@@ -77,7 +77,24 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
         appendDiagnosticLine("ProcessHelper.exec BEGIN: " + command);
         try {
             String[] commandArgs = splitCommand(command);
-            appendDiagnosticLine("PROCESS ARGUMENTS READY: argc=" + commandArgs.length + ", cwd=" + String.valueOf(workingDir));
+            // Box64 is unpacked into app-private RootFS by Winlator. Android mounts
+            // that writable directory noexec, so execute the same ARM64 binary from
+            // PackageManager's executable nativeLibraryDir copy instead.
+            if (commandArgs.length > 0 && commandArgs[0].endsWith("/usr/local/bin/box64")) {
+                String nativeLibraryPath = System.getProperty("java.library.path", "");
+                boolean relocated = false;
+                for (String directory : nativeLibraryPath.split(":")) {
+                    File packagedBox64 = new File(directory, "libbox64.so");
+                    if (packagedBox64.isFile() && packagedBox64.canExecute()) {
+                        appendDiagnosticLine("BOX64_EXEC_PATH: " + commandArgs[0] + " -> " + packagedBox64.getAbsolutePath());
+                        commandArgs[0] = packagedBox64.getAbsolutePath();
+                        relocated = true;
+                        break;
+                    }
+                }
+                if (!relocated) appendDiagnosticLine("BOX64_EXEC_PATH ERROR: executable libbox64.so not found in java.library.path=" + nativeLibraryPath);
+            }
+            appendDiagnosticLine("PROCESS ARGUMENTS READY: argc=" + commandArgs.length + ", executable=" + (commandArgs.length > 0 ? commandArgs[0] : "<none>") + ", cwd=" + String.valueOf(workingDir));
             if (commandArgs.length > 0) {
                 File executable = new File(commandArgs[0]);
                 if (executable.isFile()) {
@@ -97,23 +114,7 @@ exec_method = """    public static int exec(String command, EnvVars envVars, Fil
                 }
                 else appendDiagnosticLine("EXECUTABLE MISSING: " + executable.getAbsolutePath());
             }
-            // Android 10+ blocks execve() of binaries stored in the writable app data
-            // directory for apps targeting API 29+. Execute the system linker instead;
-            // linker64 then loads Box64 from its private RootFS path without execve() on it.
             String[] processArgs = commandArgs;
-            if (android.os.Build.VERSION.SDK_INT >= 29 && commandArgs.length > 0
-                    && commandArgs[0].startsWith("/data/")) {
-                File systemLinker = new File("/system/bin/linker64");
-                if (systemLinker.isFile()) {
-                    processArgs = new String[commandArgs.length + 1];
-                    processArgs[0] = systemLinker.getAbsolutePath();
-                    processArgs[1] = commandArgs[0];
-                    System.arraycopy(commandArgs, 1, processArgs, 2, commandArgs.length - 1);
-                    appendDiagnosticLine("ANDROID_WX_WORKAROUND: exec via " + systemLinker + " target=" + commandArgs[0]);
-                } else {
-                    appendDiagnosticLine("ANDROID_WX_WORKAROUND UNAVAILABLE: /system/bin/linker64 missing");
-                }
-            }
             ProcessBuilder processBuilder = new ProcessBuilder(processArgs).directory(workingDir);
             appendDiagnosticLine("PROCESS BUILDER READY");
             if (envVars != null) {
@@ -327,6 +328,56 @@ if [[ -d "$UPSTREAM/app/src/main/jniLibs" ]]; then
   mkdir -p "$APP/jniLibs"
   cp -a "$UPSTREAM/app/src/main/jniLibs/." "$APP/jniLibs/"
 fi
+# Android 10+ may deny execve() from the writable app data/RootFS mount.
+# Package the ARM64 Box64 executable as a JNI payload so PackageManager extracts
+# it into nativeLibraryDir, which is the app's executable native-code location.
+BOX64_ARCHIVE="$UPSTREAM/app/src/main/assets/box64/box64-0.4.4.tzst"
+if [[ ! -f "$BOX64_ARCHIVE" ]]; then
+  echo "Pinned Box64 archive not found: $BOX64_ARCHIVE" >&2
+  exit 4
+fi
+BOX64_MEMBER=$(tar --zstd -tf "$BOX64_ARCHIVE" | grep -E '(^|/)usr/local/bin/box64# Replace temporary theme fallbacks with upstream's complete resource set.
+rm -f "$APP/res/values/winlator_theme_fallback.xml"
+cp -a "$UPSTREAM/app/src/main/res/." "$APP/res/"
+# Rebrand the native startup overlay while keeping the underlying graphics/session engine intact.
+python3 - "$APP/res/values/strings.xml" "$APP/res/values-ru/strings.xml" <<'PY'
+from pathlib import Path
+import sys
+for name in sys.argv[1:]:
+    p = Path(name)
+    if not p.exists():
+        continue
+    s = p.read_text()
+    if 'name="starting_up"' in s:
+        import re
+        s = re.sub(r'(<string name="starting_up">).*?(</string>)', lambda m: m.group(1) + "Preparing Far Cry 2..." + m.group(2), s, count=1)
+    if 'name="loading"' in s:
+        import re
+        label = "Preparing Far Cry 2..." if "/values/" in name else "Подготовка Far Cry 2..."
+        s = re.sub(r'(<string name="loading">).*?(</string>)', lambda m: m.group(1) + label + m.group(2), s, count=1)
+    p.write_text(s)
+PY
+while IFS= read -r -d '' file; do
+  rel="${file#"$UPSTREAM/app/src/main/assets/"}"
+  [[ "$rel" == "index.html" ]] && continue
+  mkdir -p "$APP/assets/$(dirname "$rel")"
+  if [[ -e "$APP/assets/$rel" ]]; then echo "Asset collision: $rel" >&2; exit 2; fi
+  cp "$file" "$APP/assets/$rel"
+done < <(find "$UPSTREAM/app/src/main/assets" -type f -print0)
+echo "Java: $(find "$APP/java/com/winlator" -type f -name '*.java' | wc -l)"
+echo "C/C++: $(find "$APP/cpp" -type f | wc -l)"
+echo "JNI: $(find "$APP/jniLibs" -type f 2>/dev/null | wc -l)"
+echo "Resources: $(find "$APP/res" -type f | wc -l)"
+echo "Assets: $(find "$APP/assets" -type f | wc -l)"
+ | head -n1 || true)
+if [[ -z "$BOX64_MEMBER" ]]; then
+  echo "usr/local/bin/box64 was not found inside $BOX64_ARCHIVE" >&2
+  exit 5
+fi
+mkdir -p "$APP/jniLibs/arm64-v8a"
+tar --zstd -xOf "$BOX64_ARCHIVE" "$BOX64_MEMBER" > "$APP/jniLibs/arm64-v8a/libbox64.so"
+chmod 0755 "$APP/jniLibs/arm64-v8a/libbox64.so"
+file "$APP/jniLibs/arm64-v8a/libbox64.so"
 # Replace temporary theme fallbacks with upstream's complete resource set.
 rm -f "$APP/res/values/winlator_theme_fallback.xml"
 cp -a "$UPSTREAM/app/src/main/res/." "$APP/res/"
