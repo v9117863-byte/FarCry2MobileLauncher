@@ -833,6 +833,115 @@ if old not in s:
     raise SystemExit("X11 epoll_wait loop marker not found")
 p.write_text(s.replace(old, new, 1))
 PY
+# Provide a loopback TCP transport as a deterministic fallback for Wine's X11 client.
+# Some bundled Xtrans/libX11 builds do not enable Linux abstract AF_UNIX sockets;
+# DISPLAY=:0 then silently falls through to the host /tmp path, not RootFS.
+# Bind only to loopback and use display :100 (TCP port 6100).
+python3 - "$APP/cpp/winlator/src/xconnector_epoll.c" "$APP/java/com/winlator/xconnector/UnixSocketConfig.java" <<'PY'
+from pathlib import Path
+import sys
+c = Path(sys.argv[1])
+s = c.read_text()
+for header in ("#include <netinet/in.h>", "#include <arpa/inet.h>"):
+    if header not in s:
+        s = s.replace("#include <sys/un.h>", "#include <sys/un.h>\n" + header, 1)
+old = "    int abstractServerFd;\n    int shutdownFd;"
+new = "    int abstractServerFd;\n    int tcpServerFd;\n    int shutdownFd;"
+if old not in s: raise SystemExit("X11 connector TCP field marker missing")
+s = s.replace(old, new, 1)
+helper = r"""
+static int createTcpX11Socket(void) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+    int reuse = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+    struct sockaddr_in address = {0};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(6100);
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(fd, (struct sockaddr*)&address, sizeof(address)) < 0) goto error;
+    if (listen(fd, MAX_EVENTS) < 0) goto error;
+    __android_log_print(ANDROID_LOG_INFO, "FarCry2X11",
+        "Bound loopback TCP X11 listener 127.0.0.1:6100 (display :100)");
+    return fd;
+error:
+    __android_log_print(ANDROID_LOG_ERROR, "FarCry2X11",
+        "Failed to bind loopback TCP X11 listener: %s", strerror(errno));
+    CLOSEFD(fd);
+    return -1;
+}
+
+"""
+needle = "static void loadJMethods(JMethods* jmethods) {"
+if "createTcpX11Socket" not in s:
+    if needle not in s: raise SystemExit("X11 connector helper insertion marker missing")
+    s = s.replace(needle, helper + needle, 1)
+old = """    if (connector->abstractServerFd > 0) {
+        removeFdFromEpoll(connector->epollFd, connector->abstractServerFd);
+        CLOSEFD(connector->abstractServerFd);
+    }
+
+    if (connector->shutdownFd > 0) {"""
+new = """    if (connector->abstractServerFd > 0) {
+        removeFdFromEpoll(connector->epollFd, connector->abstractServerFd);
+        CLOSEFD(connector->abstractServerFd);
+    }
+
+    if (connector->tcpServerFd > 0) {
+        removeFdFromEpoll(connector->epollFd, connector->tcpServerFd);
+        CLOSEFD(connector->tcpServerFd);
+    }
+
+    if (connector->shutdownFd > 0) {"""
+if old not in s: raise SystemExit("X11 connector TCP destroy marker missing")
+s = s.replace(old, new, 1)
+old = "    connector->abstractServerFd = -1;\n    connector->shutdownFd = -1;"
+new = "    connector->abstractServerFd = -1;\n    connector->tcpServerFd = -1;\n    connector->shutdownFd = -1;"
+if old not in s: raise SystemExit("X11 connector TCP init marker missing")
+s = s.replace(old, new, 1)
+old = """        if (!addFdToEpoll(connector->epollFd, connector->abstractServerFd, &connector->abstractServerFd)) {
+            *failureStage = "register abstract X11 socket in epoll"; goto error;
+        }
+    }
+
+    connector->shutdownFd = eventfd(0, EFD_NONBLOCK);"""
+new = """        if (!addFdToEpoll(connector->epollFd, connector->abstractServerFd, &connector->abstractServerFd)) {
+            *failureStage = "register abstract X11 socket in epoll"; goto error;
+        }
+
+        connector->tcpServerFd = createTcpX11Socket();
+        if (connector->tcpServerFd < 0) { *failureStage = "loopback TCP X11 socket bind/listen"; goto error; }
+        if (!addFdToEpoll(connector->epollFd, connector->tcpServerFd, &connector->tcpServerFd)) {
+            *failureStage = "register loopback TCP X11 socket in epoll"; goto error;
+        }
+    }
+
+    connector->shutdownFd = eventfd(0, EFD_NONBLOCK);"""
+if old not in s: raise SystemExit("X11 connector TCP registration marker missing")
+s = s.replace(old, new, 1)
+old = """            if (events[i].data.ptr == &connector->serverFd ||
+                    events[i].data.ptr == &connector->abstractServerFd) {
+                int listeningFd = events[i].data.ptr == &connector->abstractServerFd ?
+                    connector->abstractServerFd : connector->serverFd;
+                int clientFd = accept(listeningFd, NULL, NULL);"""
+new = """            if (events[i].data.ptr == &connector->serverFd ||
+                    events[i].data.ptr == &connector->abstractServerFd ||
+                    events[i].data.ptr == &connector->tcpServerFd) {
+                int listeningFd = events[i].data.ptr == &connector->abstractServerFd ?
+                    connector->abstractServerFd :
+                    (events[i].data.ptr == &connector->tcpServerFd ?
+                        connector->tcpServerFd : connector->serverFd);
+                int clientFd = accept(listeningFd, NULL, NULL);"""
+if old not in s: raise SystemExit("X11 connector TCP accept marker missing")
+s = s.replace(old, new, 1)
+c.write_text(s)
+u = Path(sys.argv[2])
+us = u.read_text()
+old = 'public static final String XSERVER_DISPLAY = ":0";'
+new = 'public static final String XSERVER_DISPLAY = "127.0.0.1:100";'
+if old not in us: raise SystemExit("X11 display constant marker missing")
+u.write_text(us.replace(old, new, 1))
+PY
 if [[ -d "$UPSTREAM/app/src/main/jniLibs" ]]; then
   mkdir -p "$APP/jniLibs"
   cp -a "$UPSTREAM/app/src/main/jniLibs/." "$APP/jniLibs/"
