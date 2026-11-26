@@ -17,6 +17,34 @@ i686-w64-mingw32-gcc -shared -O2 -s -Wl,--kill-at \
 file "$APP/assets/fc2-compat/opengl32.dll"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
+# Render a distinct upstream PNG texture and retain the action label on every button.
+python3 - "$APP/java/com/winlator/inputcontrols/ControlElement.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = """                if (iconId > 0) {
+                    drawIcon(canvas, cx, cy, boundingBox.width(), boundingBox.height(), iconId, true);
+                }
+                else {"""
+new = """                if (iconId > 0) {
+                    drawIcon(canvas, cx, cy - boundingBox.height() * 0.13f,
+                        boundingBox.width() * 0.62f, boundingBox.height() * 0.62f, iconId, false);
+                    String text = getDisplayText();
+                    paint.setTextSize(Math.min(getTextSizeForWidth(paint, text,
+                        boundingBox.width() - strokeWidth * 2), snappingSize * 1.15f * scale));
+                    paint.setTextAlign(Paint.Align.CENTER);
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(propertyFlags.isSet(FLAG_PRESSED) ? getDarkColor() : lightColor);
+                    canvas.drawText(text, cx, cy + boundingBox.height() * 0.34f -
+                        ((paint.descent() + paint.ascent()) * 0.5f), paint);
+                }
+                else {"""
+if "boundingBox.height() * 0.34f" not in s:
+    if old not in s: raise SystemExit("ControlElement button icon rendering block missing")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
 # A malformed token in the saved Winlator environment (for example a bare
 # three-character value without '=') crashes EnvVars.putAll before XServer/Wine
 # starts. Ignore malformed tokens and record a diagnostic instead of aborting
@@ -1225,14 +1253,14 @@ profile = {
   "elements": [
     {"type":"D_PAD","shape":"CIRCLE","bindings":["KEY_W","KEY_D","KEY_S","KEY_A"],"scale":1.15,"x":0.13,"y":0.74,"toggleSwitch":False,"text":"MOVE","iconId":0},
     {"type":"TRACKPAD","shape":"CIRCLE","bindings":["MOUSE_MOVE_UP","MOUSE_MOVE_RIGHT","MOUSE_MOVE_DOWN","MOUSE_MOVE_LEFT"],"scale":1.25,"x":0.77,"y":0.49,"toggleSwitch":False,"text":"LOOK","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["MOUSE_LEFT_BUTTON","NONE","NONE","NONE"],"scale":1.12,"x":0.91,"y":0.77,"toggleSwitch":False,"text":"FIRE","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["MOUSE_RIGHT_BUTTON","NONE","NONE","NONE"],"scale":1.0,"x":0.72,"y":0.77,"toggleSwitch":False,"text":"AIM","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_R","NONE","NONE","NONE"],"scale":0.88,"x":0.91,"y":0.55,"toggleSwitch":False,"text":"RELOAD","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SPACE","NONE","NONE","NONE"],"scale":0.88,"x":0.78,"y":0.91,"toggleSwitch":False,"text":"JUMP","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_E","NONE","NONE","NONE"],"scale":0.88,"x":0.62,"y":0.91,"toggleSwitch":False,"text":"USE","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SHIFT_L","NONE","NONE","NONE"],"scale":0.88,"x":0.13,"y":0.93,"toggleSwitch":True,"text":"RUN","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_CTRL_L","NONE","NONE","NONE"],"scale":0.88,"x":0.31,"y":0.93,"toggleSwitch":True,"text":"CROUCH","iconId":0},
-    {"type":"BUTTON","shape":"ROUND_RECT","bindings":["KEY_ESC","NONE","NONE","NONE"],"scale":0.78,"x":0.49,"y":0.93,"toggleSwitch":False,"text":"MENU","iconId":0}
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["MOUSE_LEFT_BUTTON","NONE","NONE","NONE"],"scale":1.12,"x":0.91,"y":0.77,"toggleSwitch":False,"text":"FIRE","iconId":1},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["MOUSE_RIGHT_BUTTON","NONE","NONE","NONE"],"scale":1.0,"x":0.72,"y":0.77,"toggleSwitch":False,"text":"AIM","iconId":2},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_R","NONE","NONE","NONE"],"scale":0.88,"x":0.91,"y":0.55,"toggleSwitch":False,"text":"RELOAD","iconId":3},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SPACE","NONE","NONE","NONE"],"scale":0.88,"x":0.78,"y":0.91,"toggleSwitch":False,"text":"JUMP","iconId":4},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_E","NONE","NONE","NONE"],"scale":0.88,"x":0.62,"y":0.91,"toggleSwitch":False,"text":"USE","iconId":5},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SHIFT_L","NONE","NONE","NONE"],"scale":0.88,"x":0.13,"y":0.93,"toggleSwitch":True,"text":"RUN","iconId":6},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_CTRL_L","NONE","NONE","NONE"],"scale":0.88,"x":0.31,"y":0.93,"toggleSwitch":True,"text":"CROUCH","iconId":7},
+    {"type":"BUTTON","shape":"ROUND_RECT","bindings":["KEY_ESC","NONE","NONE","NONE"],"scale":0.78,"x":0.49,"y":0.93,"toggleSwitch":False,"text":"MENU","iconId":8}
   ]
 }
 p.parent.mkdir(parents=True, exist_ok=True)
