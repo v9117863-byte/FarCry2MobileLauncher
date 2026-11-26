@@ -1236,7 +1236,7 @@ profile = {
   ]
 }
 p.parent.mkdir(parents=True, exist_ok=True)
-p.write_text(json.dumps(profile, separators=(",",":")) + "\\n")
+p.write_text(json.dumps(profile, separators=(",",":")) + "\n")
 PY
 
 # Auto-apply profile 4 for the direct launcher session (no shortcut required).
