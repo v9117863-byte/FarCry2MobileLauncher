@@ -72,6 +72,42 @@ new_end = '''            case GraphicsDrivers.GLADIO:
         if (graphicsDriver[1].equals(GraphicsDrivers.GLADIO) && !new File(libDir, "libGL.so.1.7.0").isFile()) {
             throw new IllegalStateException("Gladio OpenGL driver extraction incomplete: " + new File(libDir, "libGL.so.1.7.0"));
         }
+
+        // The bundled Vortek ICD manifest comes from upstream Winlator and may
+        // contain its original package's absolute RootFS path. Wine's Vulkan
+        // loader silently skips an ICD whose library_path does not exist, which
+        // leaves DXVK without VK_KHR_surface even though Vortek is selected.
+        // Rebase every Vortek manifest on this app's actual RootFS on EVERY
+        // launch (not only after extraction), then verify the referenced ELF.
+        if (graphicsDriver[0].equals(GraphicsDrivers.VORTEK)) {
+            File vortekICDDir = new File(rootDir, "usr/share/vulkan/icd.d");
+            File[] manifests = vortekICDDir.listFiles((dir, name) -> name.endsWith(".json"));
+            if (manifests == null || manifests.length == 0) {
+                throw new IllegalStateException("Vortek ICD manifest missing: " + vortekICDDir);
+            }
+            String upstreamRoot = "/data/data/com.winlator/files/rootfs";
+            for (File manifest : manifests) {
+                try {
+                    String content = new String(java.nio.file.Files.readAllBytes(manifest.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+                    String rebased = content.replace(upstreamRoot, rootDir.getAbsolutePath());
+                    if (!rebased.equals(content)) {
+                        java.nio.file.Files.write(manifest.toPath(), rebased.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    }
+                    org.json.JSONObject icdJson = new org.json.JSONObject(rebased);
+                    String libraryPath = icdJson.getJSONObject("ICD").getString("library_path");
+                    File driverLibrary = new File(libraryPath);
+                    if (!driverLibrary.isAbsolute()) driverLibrary = new File(rootDir, libraryPath);
+                    if (!driverLibrary.isFile()) {
+                        throw new IllegalStateException("Vortek ICD library_path does not exist: " + libraryPath);
+                    }
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("VORTEK_ICD_READY manifest=" + manifest.getName() +
+                        " library=" + driverLibrary.getAbsolutePath() + " exists=true");
+                }
+                catch (Exception error) {
+                    throw new IllegalStateException("Cannot prepare Vortek ICD manifest " + manifest.getAbsolutePath(), error);
+                }
+            }
+        }
         preferences.edit().putString("current_graphics_driver", cacheId).apply();
     }'''
 if old_end not in s: raise SystemExit("Upstream graphics extraction method end not found")
