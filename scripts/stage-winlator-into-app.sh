@@ -11,10 +11,9 @@ mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 # Build a tiny 32-bit Windows OpenGL probe shim used only by Far Cry 2's
 # Ubisoft hardware detector. DX9 rendering remains on DXVK/Vulkan.
 mkdir -p "$APP/assets/fc2-compat"
-i686-w64-mingw32-gcc -shared -O2 -s \
+i686-w64-mingw32-gcc -shared -O2 -s -Wl,--kill-at \
   -o "$APP/assets/fc2-compat/opengl32.dll" \
-  "$PWD/tools/fc2-opengl-shim/opengl32.c" \
-  "$PWD/tools/fc2-opengl-shim/opengl32.def"
+  "$PWD/tools/fc2-opengl-shim/opengl32.c"
 file "$APP/assets/fc2-compat/opengl32.dll"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
