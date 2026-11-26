@@ -1,0 +1,6 @@
+LIBRARY opengl32
+EXPORTS
+    glGetString=_glGetString@4
+    wglCreateContext=_wglCreateContext@4
+    wglDeleteContext=_wglDeleteContext@4
+    wglMakeCurrent=_wglMakeCurrent@8
