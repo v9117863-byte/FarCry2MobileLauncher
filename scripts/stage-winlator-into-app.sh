@@ -1179,6 +1179,48 @@ while IFS= read -r -d '' file; do
   fi
   cp "$file" "$APP/assets/$rel"
 done < <(find "$UPSTREAM/app/src/main/assets" -type f -print0)
+
+# Rebuild the guest-side Vortek Vulkan ICD for this package. The prebuilt
+# upstream archive contains a glibc/AArch64 client with a hardcoded Winlator
+# socket path; compile the pinned Vortek source for the same Linux ABI instead.
+VORTEK_SOURCE="${2:?path to pinned Vortek source checkout required}"
+VORTEK_BUILD="$PWD/.ci/vortek-guest-build"
+python3 - "$VORTEK_SOURCE/include/vortek.h" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '#define VORTEK_SERVER_PATH "/data/data/com.winlator/files/rootfs/tmp/.vortek/V0"'
+new = '#define VORTEK_SERVER_PATH "/data/data/com.farcry2.mobile/files/rootfs/tmp/.vortek/V0"'
+if old not in s:
+    raise SystemExit("Pinned Vortek source socket-path marker missing")
+p.write_text(s.replace(old, new, 1))
+PY
+cmake -S "$VORTEK_SOURCE" -B "$VORTEK_BUILD" \
+  -DCMAKE_SYSTEM_NAME=Linux \
+  -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+  -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build "$VORTEK_BUILD" --parallel 2
+VORTEK_SO="$VORTEK_BUILD/libvulkan_vortek.so"
+if [[ ! -f "$VORTEK_SO" ]]; then
+  VORTEK_SO="$(find "$VORTEK_BUILD" -type f -name libvulkan_vortek.so -print -quit)"
+fi
+if [[ -z "$VORTEK_SO" || ! -f "$VORTEK_SO" ]]; then
+  echo "Rebuilt libvulkan_vortek.so not found" >&2
+  exit 6
+fi
+VORTEK_ARCHIVE="$APP/assets/graphics_driver/vortek-2.1.tzst"
+VORTEK_TMP="$(mktemp -d)"
+tar --zstd -xf "$VORTEK_ARCHIVE" -C "$VORTEK_TMP"
+install -m 0755 "$VORTEK_SO" "$VORTEK_TMP/usr/lib/libvulkan_vortek.so"
+tar --zstd -cf "$VORTEK_ARCHIVE.new" -C "$VORTEK_TMP" .
+mv "$VORTEK_ARCHIVE.new" "$VORTEK_ARCHIVE"
+rm -rf "$VORTEK_TMP"
+echo "Rebuilt guest Vortek ICD:"
+file "$VORTEK_SO"
+readelf -d "$VORTEK_SO" | grep NEEDED
+strings "$VORTEK_SO" | grep -F '/data/data/com.farcry2.mobile/files/rootfs/tmp/.vortek/V0'
 # Configure the guest Vulkan ICD only after the graphics driver archive has
 # been extracted and its manifest rebased by extractGraphicsDriverFiles().
 python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
