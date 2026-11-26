@@ -1185,6 +1185,19 @@ done < <(find "$UPSTREAM/app/src/main/assets" -type f -print0)
 # socket path; compile the pinned Vortek source for the same Linux ABI instead.
 VORTEK_SOURCE="${2:?path to pinned Vortek source checkout required}"
 VORTEK_BUILD="$PWD/.ci/vortek-guest-build"
+# The Vortek client source intentionally shares memory-pool primitives with
+# Winlator's renderer. These headers are part of the pinned Winlator checkout,
+# not the standalone Vortek repository.
+VORTEK_RENDERER_INCLUDE="$UPSTREAM/app/src/main/cpp/vortekrenderer/include"
+WINLATOR_NATIVE_INCLUDE="$UPSTREAM/app/src/main/cpp/winlator/include"
+for required_header in memory_pool.h winlator.h; do
+  if [[ "$required_header" == "memory_pool.h" ]]; then
+    [[ -f "$VORTEK_RENDERER_INCLUDE/$required_header" ]] || { echo "Missing pinned Winlator Vortek header: $VORTEK_RENDERER_INCLUDE/$required_header" >&2; exit 7; }
+  else
+    [[ -f "$WINLATOR_NATIVE_INCLUDE/$required_header" ]] || { echo "Missing pinned Winlator native header: $WINLATOR_NATIVE_INCLUDE/$required_header" >&2; exit 7; }
+  fi
+done
+cp "$VORTEK_RENDERER_INCLUDE/memory_pool.h" "$VORTEK_SOURCE/include/memory_pool.h"
 python3 - "$VORTEK_SOURCE/include/vortek.h" <<'PY'
 from pathlib import Path
 import sys
@@ -1201,6 +1214,7 @@ cmake -S "$VORTEK_SOURCE" -B "$VORTEK_BUILD" \
   -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
   -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
   -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_FLAGS="-I$WINLATOR_NATIVE_INCLUDE" \
   -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-rpath=/data/data/com.farcry2.mobile/files/rootfs/lib"
 cmake --build "$VORTEK_BUILD" --parallel 2
 VORTEK_SO="$VORTEK_BUILD/libvulkan_vortek.so"
