@@ -637,16 +637,18 @@ class MainActivity : Activity() {
                 val dxvkLogDir = File(rootFsDir, "tmp")
                 if (!dxvkLogDir.isDirectory) dxvkLogDir.mkdirs()
                 // Apply the upstream Far Cry 2 DXVK compatibility profile.
-                // DXVK 1.10.3 supports both options: apitraceMode improves FC2
-                // performance on all GPUs; the Nvidia vendor ID avoids the
-                // game's vegetation/render-path issue documented by DXVK PR #3241.
+                // Keep the NVIDIA vendor override from DXVK PR #3241, but leave
+                // apitraceMode disabled: DXVK documents that its altered host-visible
+                // buffer handling can break some applications. The current device
+                // reaches DXVK initialization but faults inside the D3D9 module;
+                // remove this optional behavior before changing the renderer.
                 val dxvkConfigFile = File(gameExe.parentFile ?: rootFsDir, "dxvk.conf")
                 val dxvkConfigLines = if (dxvkConfigFile.isFile)
                     dxvkConfigFile.readLines(Charsets.UTF_8).toMutableList()
                 else mutableListOf<String>()
                 val fc2DxvkOptions = linkedMapOf(
                     "d3d9.customVendorId" to "10de",
-                    "d3d9.apitraceMode" to "True"
+                    "d3d9.apitraceMode" to "False"
                 )
                 for ((key, value) in fc2DxvkOptions) {
                     val lineIndex = dxvkConfigLines.indexOfFirst {
@@ -659,7 +661,7 @@ class MainActivity : Activity() {
                 dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
-                    " customVendorId=10de apitraceMode=True")
+                    " customVendorId=10de apitraceMode=False")
                 gameEnv.put("DXVK_LOG_LEVEL", "info")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "+process,+loaddll,+seh")
