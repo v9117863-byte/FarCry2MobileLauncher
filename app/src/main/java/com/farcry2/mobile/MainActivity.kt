@@ -628,20 +628,40 @@ class MainActivity : Activity() {
                 gameEnv.put("WINEESYNC", "0")
                 gameEnv.put("WINEFSYNC", "0")
                 // Explicitly prefer DXVK's native D3D9/DXGI DLLs for this 32-bit game.
-                // Wine's registry defaults are not enough to diagnose whether the
-                // native wrapper is actually selected in the experimental WoW64 path.
                 gameEnv.put("WINEDLLOVERRIDES", "d3d9=n,b;dxgi=n,b")
-                // The previous run hid all DXVK output (upstream defaults to "none").
-                // Capture renderer initialization and Wine DLL loading into RootFS/tmp.
-                val dxvkLogDir = File(RootFS.find(this@MainActivity).rootDir, "tmp")
+                // Force the Vortek ICD instead of relying on implicit Vulkan loader
+                // discovery. Without this, Box64 can load libvulkan.so.1 while the
+                // loader silently ignores the guest ICD; DXVK then reports that the
+                // mandatory VK_KHR_surface instance extension is unavailable.
+                val rootFsDir = RootFS.find(this@MainActivity).rootDir
+                val dxvkLogDir = File(rootFsDir, "tmp")
                 if (!dxvkLogDir.isDirectory) dxvkLogDir.mkdirs()
+                val vortekIcdDir = File(rootFsDir, "usr/share/vulkan/icd.d")
+                val vortekManifests = vortekIcdDir.listFiles { file ->
+                    file.isFile && file.name.contains("vortek", ignoreCase = true) && file.name.endsWith(".json", ignoreCase = true)
+                } ?: emptyArray()
+                val vortekManifest = vortekManifests.firstOrNull()
+                    ?: throw IllegalStateException("Vortek ICD manifest not found in " + vortekIcdDir.absolutePath)
+                val vortekManifestText = vortekManifest.readText(Charsets.UTF_8)
+                val vortekLibraryPath = JSONObject(vortekManifestText).getJSONObject("ICD").getString("library_path")
+                val vortekLibrary = File(vortekLibraryPath).let { candidate ->
+                    if (candidate.isAbsolute) candidate else File(vortekManifest.parentFile, vortekLibraryPath)
+                }.canonicalFile
+                if (!vortekLibrary.isFile) {
+                    throw IllegalStateException("Vortek ICD library missing: " + vortekLibrary.absolutePath)
+                }
+                gameEnv.put("VK_ICD_FILENAMES", vortekManifest.absolutePath)
+                gameEnv.put("VK_DRIVER_FILES", vortekManifest.absolutePath)
+                gameEnv.put("VK_LOADER_DEBUG", "all")
                 gameEnv.put("DXVK_LOG_LEVEL", "info")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "+process,+loaddll,+seh")
                 container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
+                appendLaunchLog("VULKAN_ICD_FORCE manifest=" + vortekManifest.absolutePath +
+                    " library=" + vortekLibrary.absolutePath + " exists=true VK_ICD_FILENAMES/VK_DRIVER_FILES set")
                 appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
-                appendLaunchLog("DXVK_DIAGNOSTICS level=info path=" + dxvkLogDir.absolutePath + " WINEDEBUG=+loaddll,+seh")
+                appendLaunchLog("DXVK_DIAGNOSTICS level=info path=" + dxvkLogDir.absolutePath + " VK_LOADER_DEBUG=all WINEDEBUG=+loaddll,+seh")
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
                 val intent = Intent(this@MainActivity, com.winlator.XServerDisplayActivity::class.java).apply {
