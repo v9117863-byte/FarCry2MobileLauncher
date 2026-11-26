@@ -200,13 +200,28 @@ class MainActivity : Activity() {
                 // before the launcher itself receives a Java exception.
                 val winlatorLog = File(dir, "Winlator/logs.txt")
                 val launcherLines = if (launcherLog.isFile) launcherLog.readLines(Charsets.UTF_8).takeLast(60) else listOf("Журнал лаунчера пуст")
-                val winlatorLines = if (winlatorLog.isFile) winlatorLog.readLines(Charsets.UTF_8).takeLast(120) else listOf("Журнал Wine/Box64 пока не создан")
+                val winlatorAllLines = if (winlatorLog.isFile) winlatorLog.readLines(Charsets.UTF_8) else emptyList()
+                val winlatorLines = if (winlatorAllLines.isNotEmpty()) winlatorAllLines.takeLast(120) else listOf("Журнал Wine/Box64 пока не создан")
+                // Keep module-load records: the crashing IP must be mapped to its loaded DLL.
+                // These records are earlier than the exception and were omitted by the old tail-only report.
+                val moduleMapLines = winlatorAllLines.filter {
+                    it.contains("trace:loaddll:") || it.contains("trace:module:")
+                }.takeLast(180)
+                val crashContextLines = winlatorAllLines.filter {
+                    it.contains("handle_syscall_fault") ||
+                    it.contains("null_glGetString") ||
+                    it.contains("dispatch_exception") ||
+                    it.contains("unhandled exception") ||
+                    it.contains("backtrace")
+                }.takeLast(100)
                 val dxvkDir = File(RootFS.find(this@MainActivity).rootDir, "tmp")
                 val dxvkLogs = dxvkDir.listFiles()?.filter { it.isFile && it.name.endsWith(".log") }?.takeLast(4)
                     ?.flatMap { file -> listOf("DXVK FILE: " + file.name) + file.readLines(Charsets.UTF_8).takeLast(100) }
                     ?: listOf("Отдельные DXVK-логи пока не созданы")
                 "ЛАУНЧЕР:\\n" + launcherLines.joinToString("\\n") +
                     "\\n\\nWINE / BOX64 / XSERVER:\\n" + winlatorLines.joinToString("\\n") +
+                    "\\n\\nWINE MODULE MAP (loaded DLLs):\\n" + (if (moduleMapLines.isNotEmpty()) moduleMapLines.joinToString("\\n") else "Строки загрузки модулей не найдены") +
+                    "\\n\\nWINE CRASH CONTEXT:\\n" + (if (crashContextLines.isNotEmpty()) crashContextLines.joinToString("\\n") else "Строки исключения не найдены") +
                     "\\n\\nDXVK:\\n" + dxvkLogs.joinToString("\\n")
             } catch (e: Exception) {
                 "Не удалось прочитать журналы: " + (e.message ?: "неизвестная ошибка")
