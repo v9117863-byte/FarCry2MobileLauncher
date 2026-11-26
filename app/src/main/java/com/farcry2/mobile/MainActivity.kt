@@ -214,6 +214,19 @@ class MainActivity : Activity() {
                     it.contains("unhandled exception") ||
                     it.contains("backtrace")
                 }.takeLast(100)
+                // Procedure-not-found failures can occur before the final access violation.
+                // Preserve loader diagnostics separately so the report does not lose them
+                // when the Wine log grows during startup.
+                val loaderErrorLines = winlatorAllLines.filter {
+                    val line = it.lowercase()
+                    line.contains("import_dll") ||
+                    line.contains("procedure") && (line.contains("not found") || line.contains("missing")) ||
+                    line.contains("undefined symbol") ||
+                    line.contains("err:module:") ||
+                    line.contains("err:import") ||
+                    line.contains("c000007a") ||
+                    line.contains("status_procedure_not_found")
+                }.takeLast(160)
                 val dxvkDir = File(RootFS.find(this@MainActivity).rootDir, "tmp")
                 val dxvkLogs = dxvkDir.listFiles()?.filter { it.isFile && it.name.endsWith(".log") }?.takeLast(4)
                     ?.flatMap { file -> listOf("DXVK FILE: " + file.name) + file.readLines(Charsets.UTF_8).takeLast(100) }
@@ -222,6 +235,7 @@ class MainActivity : Activity() {
                     "\\n\\nWINE / BOX64 / XSERVER:\\n" + winlatorLines.joinToString("\\n") +
                     "\\n\\nWINE MODULE MAP (loaded DLLs):\\n" + (if (moduleMapLines.isNotEmpty()) moduleMapLines.joinToString("\\n") else "Строки загрузки модулей не найдены") +
                     "\\n\\nWINE CRASH CONTEXT:\\n" + (if (crashContextLines.isNotEmpty()) crashContextLines.joinToString("\\n") else "Строки исключения не найдены") +
+                    "\\n\\nWINE LOADER / MISSING PROCEDURE ERRORS:\\n" + (if (loaderErrorLines.isNotEmpty()) loaderErrorLines.joinToString("\\n") else "Ошибки загрузчика и отсутствующие процедуры не обнаружены") +
                     "\\n\\nDXVK:\\n" + dxvkLogs.joinToString("\\n")
             } catch (e: Exception) {
                 "Не удалось прочитать журналы: " + (e.message ?: "неизвестная ошибка")
@@ -698,7 +712,7 @@ class MainActivity : Activity() {
                     " customVendorId=10de apitraceMode=False")
                 gameEnv.put("DXVK_LOG_LEVEL", "info")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
-                gameEnv.put("WINEDEBUG", "+process,+loaddll,+seh")
+                gameEnv.put("WINEDEBUG", "+process,+loaddll,+module,+seh")
                 container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
                 appendLaunchLog("VULKAN_ICD_FORCE deferred=after-Winlator-driver-extraction")
