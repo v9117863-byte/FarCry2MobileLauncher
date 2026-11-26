@@ -28,6 +28,8 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         fun gameStatus(): String
         fun runtimeStatus(): String
         fun saveSettings(json: String)
+        fun loadControlLayout(): String
+        fun saveControlLayout(json: String)
         fun copyError()
     }
 
@@ -213,6 +215,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             text = "Сенсорное управление"; setTextColor(Color.WHITE); isChecked = true
         }
         body.addView(touch)
+        body.addView(button("Редактор управления") { showControlEditor() })
         body.addView(button("Сохранить настройки", true) {
             val json = JSONObject().put("resolution", resolution.selectedItem?.toString() ?: "540p")
                 .put("graphicsDriver", driver.selectedItem?.toString() ?: "Системный")
@@ -223,6 +226,213 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         })
         body.addView(button("Игровые компоненты") { showRuntime() })
         body.addView(button("Назад") { if (currentPage == "settings") showHome() })
+    }
+
+    private fun showControlEditor() {
+        currentPage = "control-editor"
+        heading("CONTROL LAYOUT", "DRAG TO MOVE  /  DOUBLE TAP TO RESIZE")
+        val elements = try { org.json.JSONArray(actions.loadControlLayout()) } catch (_: Exception) { org.json.JSONArray() }
+        val preview = ControlEditorCanvas(activity, elements)
+        body.addView(text("ПЕРЕТАСКИВАЙ КНОПКИ. ДВОЙНОЕ НАЖАТИЕ — УВЕЛИЧИТЬ.", 10f, cream, true))
+        body.addView(preview, LinearLayout.LayoutParams(-1, 0, 1f).apply {
+            topMargin = dp(8)
+            bottomMargin = dp(8)
+        })
+        body.addView(button("РАЗВЕРНУТЬ РЕДАКТОР НА ВЕСЬ ЭКРАН", true) {
+            showFullscreenControlEditor(elements)
+        })
+        val addRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val choices = listOf("FIRE", "AIM", "RELOAD", "JUMP", "USE", "CROUCH", "MAP")
+        val choice = spinner(choices, "RELOAD")
+        addRow.addView(choice, LinearLayout.LayoutParams(0, dp(44), 1f))
+        addRow.addView(button("＋ ДОБАВИТЬ") {
+            val action = choice.selectedItem?.toString() ?: "RELOAD"
+            addControlElement(elements, action)
+            preview.invalidate()
+            message("$action добавлена")
+        }.apply { layoutParams = LinearLayout.LayoutParams(dp(116), dp(44)) })
+        body.addView(addRow)
+        body.addView(button("УДАЛИТЬ ВЫБРАННУЮ") {
+            val selected = preview.selectedIndex
+            if (selected >= 0 && selected < elements.length()) {
+                elements.remove(selected)
+                preview.selectedIndex = -1
+                preview.invalidate()
+                message("Кнопка удалена")
+            } else message("Сначала выбери кнопку на поле")
+        })
+        body.addView(button("СОХРАНИТЬ РАСКЛАДКУ", true) {
+            actions.saveControlLayout(elements.toString())
+            message("Раскладка сохранена. Применится при следующем запуске игры.")
+        })
+        body.addView(button("НАЗАД") { showSettings() })
+    }
+
+    private fun addControlElement(elements: org.json.JSONArray, action: String) {
+        val spec = when (action) {
+            "FIRE" -> arrayOf("MOUSE_LEFT_BUTTON", "NONE", "NONE", "NONE")
+            "AIM" -> arrayOf("MOUSE_RIGHT_BUTTON", "NONE", "NONE", "NONE")
+            "RELOAD" -> arrayOf("KEY_R", "NONE", "NONE", "NONE")
+            "JUMP" -> arrayOf("KEY_SPACE", "NONE", "NONE", "NONE")
+            "USE" -> arrayOf("KEY_E", "NONE", "NONE", "NONE")
+            "CROUCH" -> arrayOf("KEY_CTRL_L", "NONE", "NONE", "NONE")
+            else -> arrayOf("KEY_M", "NONE", "NONE", "NONE")
+        }
+        elements.put(JSONObject().put("type", "BUTTON").put("shape", "CIRCLE")
+            .put("bindings", org.json.JSONArray(spec)).put("scale", 0.9)
+            .put("x", 0.5).put("y", 0.5).put("toggleSwitch", false)
+            .put("text", action).put("iconId", 0))
+    }
+
+    private fun showFullscreenControlEditor(elements: org.json.JSONArray) {
+        val dialog = android.app.Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val layout = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setBackgroundColor(Color.rgb(13, 20, 16))
+        }
+        val caption = text("ПОЛНЫЙ ЭКРАН — ПЕРЕТАСКИВАЙ КНОПКИ ДЛЯ ТОЧНОЙ НАСТРОЙКИ", 12f, cream, true)
+        layout.addView(caption, LinearLayout.LayoutParams(-1, dp(38)))
+        val largePreview = ControlEditorCanvas(activity, elements)
+        layout.addView(largePreview, LinearLayout.LayoutParams(-1, 0, 1f).apply {
+            topMargin = dp(6); bottomMargin = dp(8)
+        })
+        val controls = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        controls.addView(button("УДАЛИТЬ") {
+            val selected = largePreview.selectedIndex
+            if (selected in 0 until elements.length()) {
+                elements.remove(selected)
+                largePreview.selectedIndex = -1
+                largePreview.invalidate()
+            } else message("Сначала выбери кнопку")
+        }.apply { layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f) })
+        controls.addView(button("СОХРАНИТЬ", true) {
+            actions.saveControlLayout(elements.toString())
+            message("Раскладка сохранена")
+        }.apply { layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f) })
+        controls.addView(button("ГОТОВО") {
+            previewRefreshAfterDialog(elements)
+            dialog.dismiss()
+        }.apply { layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f) })
+        layout.addView(controls)
+        dialog.setContentView(layout)
+        dialog.show()
+        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+    }
+
+    private fun previewRefreshAfterDialog(elements: org.json.JSONArray) {
+        // The main editor is recreated from the persisted layout when reopened.
+        message("Изменения редактора готовы к сохранению")
+    }
+
+    private class ControlEditorCanvas(
+        context: Activity,
+        private val elements: org.json.JSONArray
+    ) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        var selectedIndex = -1
+        private var dragging = -1
+        private var lastTapIndex = -1
+        private var lastTapAt = 0L
+        private var downX = 0f
+        private var downY = 0f
+        private val density = context.resources.displayMetrics.density
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val w = width.toFloat().coerceAtLeast(1f)
+            val h = height.toFloat().coerceAtLeast(1f)
+            paint.shader = RadialGradient(w/2f,h/2f,h*0.9f,
+                intArrayOf(Color.rgb(69,78,52),Color.rgb(25,34,27),Color.rgb(10,16,12)),
+                null,Shader.TileMode.CLAMP)
+            canvas.drawRect(0f,0f,w,h,paint); paint.shader = null
+            paint.color = Color.argb(35,230,211,157)
+            for (x in 0..(w/24).toInt()) canvas.drawLine(x*24f,0f,x*24f,h,paint)
+            for (y in 0..(h/24).toInt()) canvas.drawLine(0f,y*24f,w,y*24f,paint)
+            paint.color = Color.argb(90,226,199,137)
+            paint.style = Paint.Style.STROKE; paint.strokeWidth = 1.2f*density
+            canvas.drawRoundRect(5f,5f,w-5f,h-5f,12f*density,12f*density,paint)
+            paint.style = Paint.Style.FILL
+            for (i in 0 until elements.length()) {
+                val item = elements.optJSONObject(i) ?: continue
+                val x = (item.optDouble("x",0.5)*w).toFloat()
+                val y = (item.optDouble("y",0.5)*h).toFloat()
+                val scale = item.optDouble("scale",0.9).toFloat()
+                val radius = (if (item.optString("type") == "D_PAD" || item.optString("type") == "TRACKPAD") 35f else 23f) * density * scale
+                val label = item.optString("text","BTN")
+                val color = when (label.uppercase()) {
+                    "FIRE" -> Color.rgb(153,75,48)
+                    "AIM" -> Color.rgb(81,101,71)
+                    "MOVE" -> Color.rgb(105,111,70)
+                    "LOOK" -> Color.rgb(72,91,75)
+                    "RELOAD" -> Color.rgb(138,105,58)
+                    else -> Color.rgb(91,99,70)
+                }
+                paint.shader = RadialGradient(x-radius*.35f,y-radius*.4f,radius*1.5f,
+                    intArrayOf(Color.rgb(203,179,119),color,Color.rgb(23,31,23)),
+                    null,Shader.TileMode.CLAMP)
+                canvas.drawCircle(x,y,radius,paint); paint.shader = null
+                val save = canvas.save()
+                canvas.clipPath(Path().apply { addCircle(x,y,radius-2f,Path.Direction.CW) })
+                paint.color = Color.argb(38,245,227,180)
+                paint.strokeWidth = 1.4f*density
+                for (k in -3..3) canvas.drawLine(x-radius,y+k*8f*density,x+radius,y+(k+5)*8f*density,paint)
+                canvas.restoreToCount(save)
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = if (i == selectedIndex) 3f*density else 1f*density
+                paint.color = if (i == selectedIndex) Color.rgb(255,215,126) else Color.argb(190,213,190,126)
+                canvas.drawCircle(x,y,radius,paint); paint.style = Paint.Style.FILL
+                paint.color = Color.WHITE
+                paint.textAlign = Paint.Align.CENTER
+                paint.typeface = Typeface.create("sans-serif-condensed",Typeface.BOLD)
+                paint.textSize = (if (radius > 30f*density) 10f else 9f)*density
+                canvas.drawText(label.take(8),x,y+3.5f*density,paint)
+            }
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            val w = width.toFloat().coerceAtLeast(1f)
+            val h = height.toFloat().coerceAtLeast(1f)
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX=event.x; downY=event.y; dragging=-1
+                    var best=Float.MAX_VALUE
+                    for (i in 0 until elements.length()) {
+                        val item=elements.optJSONObject(i) ?: continue
+                        val x=(item.optDouble("x",0.5)*w).toFloat()
+                        val y=(item.optDouble("y",0.5)*h).toFloat()
+                        val r=(if(item.optString("type")=="D_PAD" || item.optString("type")=="TRACKPAD") 38f else 28f)*density*item.optDouble("scale",0.9).toFloat()
+                        val d=kotlin.math.hypot((event.x-x).toDouble(),(event.y-y).toDouble())
+                        if(d<=r.toDouble() && d<best.toDouble()){best=d.toFloat();dragging=i}
+                    }
+                    selectedIndex=dragging
+                    if(dragging>=0){
+                        val now=event.eventTime
+                        if(dragging==lastTapIndex && now-lastTapAt<320L){
+                            val item=elements.optJSONObject(dragging)
+                            item?.put("scale",(item.optDouble("scale",0.9)+0.1).coerceAtMost(1.6))
+                            lastTapIndex=-1
+                        } else {lastTapIndex=dragging;lastTapAt=now}
+                    }
+                    invalidate(); return true
+                }
+                MotionEvent.ACTION_MOVE -> if(dragging>=0){
+                    val item=elements.optJSONObject(dragging) ?: return true
+                    val dx=event.x-downX; val dy=event.y-downY
+                    val oldX=(item.optDouble("x",0.5)*w).toFloat()
+                    val oldY=(item.optDouble("y",0.5)*h).toFloat()
+                    item.put("x",((oldX+dx)/w).coerceIn(0.04f,0.96f))
+                    item.put("y",((oldY+dy)/h).coerceIn(0.08f,0.92f))
+                    downX=event.x; downY=event.y; invalidate(); return true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {dragging=-1;return true}
+            }
+            return true
+        }
     }
 
     private fun spinner(values: List<String>, selected: String): Spinner {
