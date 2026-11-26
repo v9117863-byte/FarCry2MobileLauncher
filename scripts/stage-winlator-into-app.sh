@@ -1200,7 +1200,8 @@ cmake -S "$VORTEK_SOURCE" -B "$VORTEK_BUILD" \
   -DCMAKE_SYSTEM_NAME=Linux \
   -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
   -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-rpath=/data/data/com.farcry2.mobile/files/rootfs/lib"
 cmake --build "$VORTEK_BUILD" --parallel 2
 VORTEK_SO="$VORTEK_BUILD/libvulkan_vortek.so"
 if [[ ! -f "$VORTEK_SO" ]]; then
@@ -1220,6 +1221,7 @@ rm -rf "$VORTEK_TMP"
 echo "Rebuilt guest Vortek ICD:"
 file "$VORTEK_SO"
 readelf -d "$VORTEK_SO" | grep NEEDED
+readelf -d "$VORTEK_SO" | grep -E 'RUNPATH|RPATH' | grep -F '/data/data/com.farcry2.mobile/files/rootfs/lib'
 strings "$VORTEK_SO" | grep -F '/data/data/com.farcry2.mobile/files/rootfs/tmp/.vortek/V0'
 # Configure the guest Vulkan ICD only after the graphics driver archive has
 # been extracted and its manifest rebased by extractGraphicsDriverFiles().
