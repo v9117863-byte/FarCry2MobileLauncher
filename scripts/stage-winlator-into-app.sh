@@ -100,6 +100,50 @@ new_end = '''            case GraphicsDrivers.GLADIO:
                     if (!driverLibrary.isFile()) {
                         throw new IllegalStateException("Vortek ICD library_path does not exist: " + libraryPath);
                     }
+
+                    // The upstream ARM64 Vortek ICD embeds the original Winlator
+                    // package's absolute IPC socket path in .rodata. Unlike the
+                    // manifest, that path is NOT read from VORTEK_SERVER_PATH.
+                    // GuestProgramLauncher starts Box64 with cwd=rootDir, so use
+                    // a RootFS-relative Unix socket path that resolves to the
+                    // Android VortekRendererComponent listener for this package.
+                    byte[] vortekElf = java.nio.file.Files.readAllBytes(driverLibrary.toPath());
+                    byte[] oldSocketPath = "/data/data/com.winlator/files/rootfs/tmp/.vortek/V0".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+                    byte[] relativeSocketPath = "tmp/.vortek/V0".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+                    int oldMatches = 0;
+                    int relativeMatches = 0;
+                    int socketPathOffset = -1;
+                    for (int i = 0; i <= vortekElf.length - oldSocketPath.length; i++) {
+                        boolean oldMatch = true;
+                        boolean relativeMatch = true;
+                        for (int j = 0; j < oldSocketPath.length; j++) {
+                            if (vortekElf[i + j] != oldSocketPath[j]) oldMatch = false;
+                            if (j < relativeSocketPath.length && vortekElf[i + j] != relativeSocketPath[j]) relativeMatch = false;
+                            if (!oldMatch && !relativeMatch) break;
+                        }
+                        if (oldMatch) { oldMatches++; socketPathOffset = i; }
+                    }
+                    for (int i = 0; i <= vortekElf.length - relativeSocketPath.length; i++) {
+                        boolean match = true;
+                        for (int j = 0; j < relativeSocketPath.length; j++) {
+                            if (vortekElf[i + j] != relativeSocketPath[j]) { match = false; break; }
+                        }
+                        if (match) relativeMatches++;
+                    }
+                    if (oldMatches == 1) {
+                        System.arraycopy(relativeSocketPath, 0, vortekElf, socketPathOffset, relativeSocketPath.length);
+                        java.util.Arrays.fill(vortekElf, socketPathOffset + relativeSocketPath.length,
+                            socketPathOffset + oldSocketPath.length, (byte)0);
+                        java.nio.file.Files.write(driverLibrary.toPath(), vortekElf);
+                        relativeMatches++;
+                    }
+                    else if (oldMatches != 0 || relativeMatches == 0) {
+                        throw new IllegalStateException("Unexpected Vortek IPC path in ELF: oldMatches=" +
+                            oldMatches + ", relativeMatches=" + relativeMatches + ", library=" + driverLibrary);
+                    }
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine("VORTEK_SOCKET_PATH_PATCHED library=" +
+                        driverLibrary.getAbsolutePath() + " oldMatches=" + oldMatches +
+                        " relativeMatches=" + relativeMatches + " path=tmp/.vortek/V0 cwd=" + rootDir.getAbsolutePath());
                     com.winlator.core.ProcessHelper.appendDiagnosticLine("VORTEK_ICD_READY manifest=" + manifest.getName() +
                         " library=" + driverLibrary.getAbsolutePath() + " exists=true");
                 }
