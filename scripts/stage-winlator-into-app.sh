@@ -557,11 +557,12 @@ startup_new = """        final java.util.concurrent.atomic.AtomicReference<Strin
                     android.util.Log.i("FarCry2Startup", startupStage.get());
                     com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
                     extractGraphicsDriverFiles();
-                    startupStage.set("Настройка звука Wine");
-                    android.util.Log.i("FarCry2Startup", startupStage.get());
-                    com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
-                    changeWineAudioDriver();
                 }
+                startupStage.set("Настройка звука Wine (PulseAudio)");
+                android.util.Log.i("FarCry2Startup", startupStage.get());
+                com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
+                // Reapply the selected backend on every launch, including existing prefixes.
+                changeWineAudioDriver();
                 startupStage.set("Запуск X-сервера и Wine");
                 android.util.Log.i("FarCry2Startup", startupStage.get());
                     com.winlator.core.ProcessHelper.appendDiagnosticLine("STARTUP: " + startupStage.get());
@@ -1260,7 +1261,10 @@ profile = {
     {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_E","NONE","NONE","NONE"],"scale":0.88,"x":0.62,"y":0.91,"toggleSwitch":False,"text":"USE","iconId":5},
     {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SHIFT_L","NONE","NONE","NONE"],"scale":0.88,"x":0.13,"y":0.93,"toggleSwitch":True,"text":"RUN","iconId":6},
     {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_CTRL_L","NONE","NONE","NONE"],"scale":0.88,"x":0.31,"y":0.93,"toggleSwitch":True,"text":"CROUCH","iconId":7},
-    {"type":"BUTTON","shape":"ROUND_RECT","bindings":["KEY_ESC","NONE","NONE","NONE"],"scale":0.78,"x":0.49,"y":0.93,"toggleSwitch":False,"text":"MENU","iconId":8}
+    {"type":"BUTTON","shape":"ROUND_RECT","bindings":["KEY_ESC","NONE","NONE","NONE"],"scale":0.78,"x":0.49,"y":0.93,"toggleSwitch":False,"text":"MENU","iconId":8},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_G","NONE","NONE","NONE"],"scale":0.78,"x":0.91,"y":0.34,"toggleSwitch":False,"text":"GRENADE","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_V","NONE","NONE","NONE"],"scale":0.78,"x":0.77,"y":0.34,"toggleSwitch":False,"text":"MELEE","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_1","NONE","NONE","NONE"],"scale":0.78,"x":0.63,"y":0.34,"toggleSwitch":False,"text":"WEAPON","iconId":0}
   ]
 }
 p.parent.mkdir(parents=True, exist_ok=True)
