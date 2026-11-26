@@ -757,7 +757,7 @@ class MainActivity : Activity() {
                 gameEnv.put("WINEESYNC", "0")
                 gameEnv.put("WINEFSYNC", "0")
                 // Explicitly prefer DXVK's native D3D9/DXGI DLLs for this 32-bit game.
-                gameEnv.put("WINEDLLOVERRIDES", "d3d10=disabled;d3d10core=disabled;d3d11=disabled;d3d9=n,b;dxgi=n,b")
+                gameEnv.put("WINEDLLOVERRIDES", "opengl32=b;d3d10=disabled;d3d10core=disabled;d3d11=disabled;d3d9=n,b;dxgi=n,b")
                 // Force the Vortek ICD instead of relying on implicit Vulkan loader
                 // discovery. Without this, Box64 can load libvulkan.so.1 while the
                 // loader silently ignores the guest ICD; DXVK then reports that the
@@ -799,7 +799,7 @@ class MainActivity : Activity() {
                 container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
                 appendLaunchLog("VULKAN_ICD_FORCE deferred=after-Winlator-driver-extraction")
-                appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=opengl32:default;d3d10:disabled;d3d10core:disabled;d3d11:disabled;d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
+                appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=opengl32:builtin-only;d3d10:disabled;d3d10core:disabled;d3d11:disabled;d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
                 appendLaunchLog("DXVK_DIAGNOSTICS level=info path=" + dxvkLogDir.absolutePath + " VK_LOADER_DEBUG=all WINEDEBUG=+loaddll,+seh")
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
