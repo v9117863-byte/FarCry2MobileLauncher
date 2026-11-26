@@ -33,7 +33,7 @@ method = """    private void changeWineAudioDriver() {
         File userRegFile = new File(rootDir, RootFS.WINEPREFIX+"/user.reg");
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
             if (audioDriver.equals(AudioDrivers.ALSA)) {
-                registryEditor.setStringValue("Software\\Wine\\Drivers", "Audio", "alsa");
+                registryEditor.setStringValue("Software\\\\Wine\\\\Drivers", "Audio", "alsa");
             }
             else if (audioDriver.equals(AudioDrivers.PULSEAUDIO)) {
                 registryEditor.setStringValue("Software\\Wine\\Drivers", "Audio", "pulse");
