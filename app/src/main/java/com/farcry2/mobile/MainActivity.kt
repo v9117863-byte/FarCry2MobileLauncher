@@ -543,20 +543,45 @@ class MainActivity : Activity() {
                     )
                 } else {
                     val oldProfile = fc2Profile.readText()
-                    val forcedDx9Profile = oldProfile.replace(
-                        Regex("Platform=\"[^\"]*\""),
-                        "Platform=\"d3d9\""
+                    // A profile left by an earlier run can retain fullscreen/HDR/MSAA
+                    // settings that produce a black surface on the Android X11 bridge.
+                    // Force a conservative windowed DX9 mode on every launch, not only
+                    // when the profile is first created.
+                    val renderTag = Regex("<RenderProfile\\b[^>]*>")
+                    val match = renderTag.find(oldProfile)
+                        ?: throw IllegalStateException("В GamerProfile.xml отсутствует RenderProfile")
+                    var renderAttrs = match.value
+                    val forcedAttrs = linkedMapOf(
+                        "Platform" to "d3d9",
+                        "Fullscreen" to "0",
+                        "Maximized" to "0",
+                        "ResolutionX" to profileWidth.toString(),
+                        "ResolutionY" to profileHeight.toString(),
+                        "VSync" to "0",
+                        "MultiSampleMode" to "0",
+                        "AlphaToCoverage" to "0",
+                        "Hdr" to "0",
+                        "HdrFP32" to "0",
+                        "Bloom" to "0",
+                        "AllowAsynchShaderLoading" to "0",
+                        "MaxDriverBufferedFrames" to "1"
                     )
-                    if (forcedDx9Profile != oldProfile) fc2Profile.writeText(forcedDx9Profile)
-                }
-                // Some Wine prefixes expose the game profile directly under the user home.
-                // Keep a second copy there as well; the Windows Documents location remains primary.
-                val alternateProfile = File(container.getUserDir(), "My Games/Far Cry 2/GamerProfile.xml")
-                if (!alternateProfile.isFile) {
-                    val alternateDir = alternateProfile.parentFile
-                    if (alternateDir != null && (alternateDir.isDirectory || alternateDir.mkdirs())) {
-                        fc2Profile.copyTo(alternateProfile, overwrite = false)
+                    for ((key, value) in forcedAttrs) {
+                        val attr = Regex("\\b" + Regex.escape(key) + "=\"[^\"]*\"")
+                        renderAttrs = if (attr.containsMatchIn(renderAttrs)) {
+                            attr.replace(renderAttrs, "$key=\"$value\"")
+                        } else {
+                            renderAttrs.dropLast(1) + " $key=\"$value\">"
+                        }
                     }
+                    val forcedProfile = oldProfile.replaceRange(match.range, renderAttrs)
+                    if (forcedProfile != oldProfile) fc2Profile.writeText(forcedProfile)
+                }
+                // Mirror the enforced profile to both locations used by FC2/Wine.
+                val alternateProfile = File(container.getUserDir(), "My Games/Far Cry 2/GamerProfile.xml")
+                val alternateDir = alternateProfile.parentFile
+                if (alternateDir != null && (alternateDir.isDirectory || alternateDir.mkdirs())) {
+                    fc2Profile.copyTo(alternateProfile, overwrite = true)
                 }
                 appendLaunchLog("FC2_PROFILE path=" + fc2Profile.absolutePath + " alternate=" + alternateProfile.absolutePath + " platform=d3d9 size=" + profileWidth + "x" + profileHeight)
                 // Apply the graphics choice from the launcher. Previously the UI saved
