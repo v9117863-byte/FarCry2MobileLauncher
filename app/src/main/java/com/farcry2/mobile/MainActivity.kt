@@ -76,6 +76,8 @@ class MainActivity : Activity() {
             override fun gameStatus() = bridge.getGameInstallStatus()
             override fun runtimeStatus() = bridge.getRuntimeBundleStatus()
             override fun saveSettings(json: String) = bridge.saveLaunchSettings(json)
+            override fun loadControlLayout() = bridge.loadControlLayout()
+            override fun saveControlLayout(json: String) = bridge.saveControlLayout(json)
             override fun copyError() = bridge.copyErrorToClipboard("Native launcher diagnostic report")
         })
         setContentView(nativeUi!!.root)
@@ -878,6 +880,46 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun isGameRunning(): Boolean =
             gameProcess?.isAlive == true || try { com.winlator.XServerDisplayActivity.isSessionActive() } catch (_: Exception) { false }
+
+        @JavascriptInterface fun loadControlLayout(): String {
+            return try {
+                val dir = File(filesDir, "profiles")
+                if (!dir.isDirectory && !dir.mkdirs()) throw IllegalStateException("Cannot create profiles directory")
+                val profile = File(dir, "controls-4.icp")
+                if (!profile.isFile) assets.open("inputcontrols/profiles/controls-4.icp").use { input ->
+                    profile.outputStream().use { input.copyTo(it) }
+                }
+                val data = JSONObject(profile.readText(Charsets.UTF_8))
+                // The cursor remains visible as requested; preserve that across editor saves.
+                if (data.optBoolean("hideMouseCursor", false)) {
+                    data.put("hideMouseCursor", false)
+                    profile.writeText(data.toString(), Charsets.UTF_8)
+                }
+                data.optJSONArray("elements")?.toString() ?: "[]"
+            } catch (error: Exception) {
+                appendLaunchLog("CONTROL_LAYOUT_READ_ERROR " + error)
+                "[]"
+            }
+        }
+
+        @JavascriptInterface fun saveControlLayout(elementsJson: String) {
+            try {
+                val elements = org.json.JSONArray(elementsJson)
+                val dir = File(filesDir, "profiles")
+                if (!dir.isDirectory && !dir.mkdirs()) throw IllegalStateException("Cannot create profiles directory")
+                val profile = File(dir, "controls-4.icp")
+                val data = if (profile.isFile) JSONObject(profile.readText(Charsets.UTF_8)) else JSONObject()
+                data.put("id", 4)
+                data.put("name", "FPS")
+                data.put("cursorSpeed", 1.35)
+                data.put("hideMouseCursor", false)
+                data.put("elements", elements)
+                profile.writeText(data.toString(), Charsets.UTF_8)
+                appendLaunchLog("CONTROL_LAYOUT_SAVED elements=" + elements.length())
+            } catch (error: Exception) {
+                appendLaunchLog("CONTROL_LAYOUT_SAVE_ERROR " + error)
+            }
+        }
 
         @JavascriptInterface fun saveLaunchSettings(json: String) {
             prefs.edit().putString("launch_settings", json).apply()
