@@ -658,6 +658,8 @@ class MainActivity : Activity() {
                 }
                 dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
+                appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
+                    " customVendorId=10de apitraceMode=True")
                 gameEnv.put("DXVK_LOG_LEVEL", "info")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "+process,+loaddll,+seh")
