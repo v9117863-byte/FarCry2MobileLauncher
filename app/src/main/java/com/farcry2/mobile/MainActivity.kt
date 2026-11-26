@@ -53,7 +53,6 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         selectedTree = prefs.getString("game_tree_uri", null)?.let(Uri::parse)
-        com.winlator.core.ProcessHelper.setNativeLibraryDir(applicationInfo.nativeLibraryDir)
         val bridge = AndroidBridge()
         nativeUi = NativeLauncherUi(this, object : NativeLauncherUi.Actions {
             override fun launch() = bridge.launchGame()
