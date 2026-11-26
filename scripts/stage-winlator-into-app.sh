@@ -1171,7 +1171,13 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 old = '''            envVars.putAll(container.getEnvVars());
-            if (shortcut != null) envVars.putAll(shortcut.getExtra("envVars"));'''
+            if (shortcut != null) envVars.putAll(shortcut.getExtra("envVars"));
+            if (graphicsDriver[0].equals(GraphicsDrivers.VORTEK)) {
+                String vortekServerPath = rootPath + UnixSocketConfig.VORTEK_SERVER_PATH;
+                envVars.put("VORTEK_SERVER_PATH", vortekServerPath);
+                com.winlator.core.ProcessHelper.appendDiagnosticLine(
+                    "VORTEK_IPC_ENV path=" + vortekServerPath + " component=VortekRendererComponent");
+            }'''
 new = '''            envVars.putAll(container.getEnvVars());
             if (graphicsDriver[0].equals(GraphicsDrivers.VORTEK)) {
                 try {
