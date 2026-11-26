@@ -259,18 +259,18 @@ s = pattern.sub(lambda m: exec_method, s, count=1)
 # Upstream splitCommand() accidentally keeps the opening and closing quote
 # characters in each quoted argument. This makes WinHandler receive
 # "FarCry2.exe" (including literal quotes) and fail to resolve the EXE.
-split_old = re.compile(r'public static String\\[\\] splitCommand\\(String command\\) \\{.*?\\n    \\}', re.S)
+split_old = re.compile(r'public static String\[\] splitCommand\(String command\) \{.*?\n    \}', re.S)
 split_new = """public static String[] splitCommand(String command) {
         ArrayList<String> result = new ArrayList<>();
         StringBuilder value = new StringBuilder();
         boolean inQuotes = false;
         for (int i = 0; i < command.length(); i++) {
             char current = command.charAt(i);
-            if (current == '\\"') {
+            if (current == '"') {
                 inQuotes = !inQuotes;
                 continue;
             }
-            if (!inQuotes && current == '\\\\' && i + 1 < command.length() && command.charAt(i + 1) == ' ') {
+            if (!inQuotes && current == '\\' && i + 1 < command.length() && command.charAt(i + 1) == ' ') {
                 value.append(' ');
                 i++;
                 continue;
