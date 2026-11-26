@@ -1163,6 +1163,47 @@ while IFS= read -r -d '' file; do
   fi
   cp "$file" "$APP/assets/$rel"
 done < <(find "$UPSTREAM/app/src/main/assets" -type f -print0)
+# Configure the guest Vulkan ICD only after the graphics driver archive has
+# been extracted and its manifest rebased by extractGraphicsDriverFiles().
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '''            envVars.putAll(container.getEnvVars());
+            if (shortcut != null) envVars.putAll(shortcut.getExtra("envVars"));'''
+new = '''            envVars.putAll(container.getEnvVars());
+            if (graphicsDriver[0].equals(GraphicsDrivers.VORTEK)) {
+                File icdDir = new File(rootFS.getRootDir(), "usr/share/vulkan/icd.d");
+                File[] manifests = icdDir.listFiles((dir, name) ->
+                    name.toLowerCase().contains("vortek") && name.toLowerCase().endsWith(".json"));
+                if (manifests == null || manifests.length == 0) {
+                    throw new IllegalStateException("Vortek ICD manifest missing after graphics driver extraction: " + icdDir);
+                }
+                File manifest = manifests[0].getCanonicalFile();
+                String manifestText = new String(java.nio.file.Files.readAllBytes(manifest.toPath()),
+                    java.nio.charset.StandardCharsets.UTF_8);
+                org.json.JSONObject icd = new org.json.JSONObject(manifestText).getJSONObject("ICD");
+                String libraryPath = icd.getString("library_path");
+                File library = new File(libraryPath);
+                if (!library.isAbsolute()) library = new File(rootFS.getRootDir(), libraryPath);
+                library = library.getCanonicalFile();
+                if (!library.isFile()) {
+                    throw new IllegalStateException("Vortek ICD library missing after extraction: " + library);
+                }
+                envVars.put("VK_ICD_FILENAMES", manifest.getAbsolutePath());
+                envVars.put("VK_DRIVER_FILES", manifest.getAbsolutePath());
+                envVars.put("VK_LOADER_DEBUG", "all");
+                com.winlator.core.ProcessHelper.appendDiagnosticLine(
+                    "VULKAN_ICD_READY manifest=" + manifest.getAbsolutePath() +
+                    " library=" + library.getAbsolutePath() + " exists=true");
+            }
+            if (shortcut != null) envVars.putAll(shortcut.getExtra("envVars"));'''
+if "VULKAN_ICD_READY manifest=" not in s:
+    if old not in s: raise SystemExit("Post-extraction environment marker not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
 echo "Java: $(find "$APP/java/com/winlator" -type f -name '*.java' | wc -l)"
 echo "C/C++: $(find "$APP/cpp" -type f | wc -l)"
 echo "JNI: $(find "$APP/jniLibs" -type f 2>/dev/null | wc -l)"
