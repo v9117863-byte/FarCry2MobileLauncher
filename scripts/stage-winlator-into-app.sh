@@ -1214,6 +1214,76 @@ while IFS= read -r -d '' file; do
   cp "$file" "$APP/assets/$rel"
 done < <(find "$UPSTREAM/app/src/main/assets" -type f -print0)
 
+# Seed the Far Cry 2 touch layout as profile 4. The launcher editor reads and
+# writes this same profile; cursor remains visible for mouse/trackpad use.
+python3 - "$APP/assets/inputcontrols/profiles/controls-4.icp" <<'PY'
+import json, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+profile = {
+  "id": 4, "name": "FPS", "cursorSpeed": 1.35, "hideMouseCursor": False,
+  "elements": [
+    {"type":"D_PAD","shape":"CIRCLE","bindings":["KEY_W","KEY_D","KEY_S","KEY_A"],"scale":1.15,"x":0.13,"y":0.74,"toggleSwitch":False,"text":"MOVE","iconId":0},
+    {"type":"TRACKPAD","shape":"CIRCLE","bindings":["MOUSE_MOVE_UP","MOUSE_MOVE_RIGHT","MOUSE_MOVE_DOWN","MOUSE_MOVE_LEFT"],"scale":1.25,"x":0.77,"y":0.49,"toggleSwitch":False,"text":"LOOK","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["MOUSE_LEFT_BUTTON","NONE","NONE","NONE"],"scale":1.12,"x":0.91,"y":0.77,"toggleSwitch":False,"text":"FIRE","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["MOUSE_RIGHT_BUTTON","NONE","NONE","NONE"],"scale":1.0,"x":0.72,"y":0.77,"toggleSwitch":False,"text":"AIM","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_R","NONE","NONE","NONE"],"scale":0.88,"x":0.91,"y":0.55,"toggleSwitch":False,"text":"RELOAD","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SPACE","NONE","NONE","NONE"],"scale":0.88,"x":0.78,"y":0.91,"toggleSwitch":False,"text":"JUMP","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_E","NONE","NONE","NONE"],"scale":0.88,"x":0.62,"y":0.91,"toggleSwitch":False,"text":"USE","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SHIFT_L","NONE","NONE","NONE"],"scale":0.88,"x":0.13,"y":0.93,"toggleSwitch":True,"text":"RUN","iconId":0},
+    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_CTRL_L","NONE","NONE","NONE"],"scale":0.88,"x":0.31,"y":0.93,"toggleSwitch":True,"text":"CROUCH","iconId":0},
+    {"type":"BUTTON","shape":"ROUND_RECT","bindings":["KEY_ESC","NONE","NONE","NONE"],"scale":0.78,"x":0.49,"y":0.93,"toggleSwitch":False,"text":"MENU","iconId":0}
+  ]
+}
+p.parent.mkdir(parents=True, exist_ok=True)
+p.write_text(json.dumps(profile, separators=(",",":")) + "\\n")
+PY
+
+# Auto-apply profile 4 for the direct launcher session (no shortcut required).
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = """        if (shortcut != null) {
+            String controlsProfile = shortcut.getExtra("controlsProfile");
+            if (!controlsProfile.isEmpty()) {
+                ControlsProfile profile = inputControlsManager.getProfile(Integer.parseInt(controlsProfile));
+                if (profile != null) showInputControls(profile);
+            }
+        }
+
+        if (MainActivity.DEBUG_MODE)"""
+new = """        boolean customControlsApplied = false;
+        if (shortcut != null) {
+            String controlsProfile = shortcut.getExtra("controlsProfile");
+            if (!controlsProfile.isEmpty()) {
+                ControlsProfile profile = inputControlsManager.getProfile(Integer.parseInt(controlsProfile));
+                if (profile != null) {
+                    showInputControls(profile);
+                    customControlsApplied = true;
+                }
+            }
+        }
+        if (!customControlsApplied) {
+            ControlsProfile fc2Profile = inputControlsManager.getProfile(4);
+            if (fc2Profile != null) {
+                fc2Profile.setHideMouseCursor(false);
+                fc2Profile.save();
+                showInputControls(fc2Profile);
+                com.winlator.core.ProcessHelper.appendDiagnosticLine(
+                    "FC2_TOUCH_CONTROLS profile=4 name=" + fc2Profile.getName() +
+                    " elements=" + fc2Profile.getElements().size() + " cursorHidden=false");
+            }
+        }
+
+        if (MainActivity.DEBUG_MODE)"""
+if "FC2_TOUCH_CONTROLS profile=4" not in s:
+    if old not in s: raise SystemExit("setupUI controls-profile insertion point missing")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
+
 # Rebuild the guest-side Vortek Vulkan ICD for this package. The prebuilt
 # upstream archive contains a glibc/AArch64 client with a hardcoded Winlator
 # socket path; compile the pinned Vortek source for the same Linux ABI instead.
