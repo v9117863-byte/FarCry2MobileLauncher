@@ -24,6 +24,13 @@ jobs:
           ref: f8a211ce7fd776de9a2642b45d166016876eaa86
           path: .ci/winlator-upstream
           persist-credentials: false
+      - name: Checkout pinned Vortek guest ICD source
+        uses: actions/checkout@v4
+        with:
+          repository: brunodev85/vortek
+          ref: 4e0d790ef8afee4766b40e194bc82d2505d5ea0f
+          path: .ci/vortek-upstream
+          persist-credentials: false
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
