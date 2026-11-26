@@ -12,7 +12,7 @@ mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 # Ubisoft hardware detector. DX9 rendering remains on DXVK/Vulkan.
 mkdir -p "$APP/assets/fc2-compat"
 i686-w64-mingw32-gcc -shared -O2 -s -Wl,--kill-at \
-  -o "$APP/assets/fc2-compat/opengl32.dll" \
+  -o "$APP/assets/fc2-compat/fcopengl.dll" \
   "$PWD/tools/fc2-opengl-shim/opengl32.c"
 file "$APP/assets/fc2-compat/opengl32.dll"
 mkdir -p "$APP/java/com"
