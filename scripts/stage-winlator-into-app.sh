@@ -25,7 +25,7 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 start = s.find("    private void changeWineAudioDriver() {")
-end = s.find("\n    private void applyGeneralPatches", start)
+end = s.find("\n    private void ", start + 48)
 if start < 0 or end < 0:
     raise SystemExit("changeWineAudioDriver method boundaries not found")
 method = """    private void changeWineAudioDriver() {
@@ -36,7 +36,7 @@ method = """    private void changeWineAudioDriver() {
                 registryEditor.setStringValue("Software\\\\Wine\\\\Drivers", "Audio", "alsa");
             }
             else if (audioDriver.equals(AudioDrivers.PULSEAUDIO)) {
-                registryEditor.setStringValue("Software\\Wine\\Drivers", "Audio", "pulse");
+                registryEditor.setStringValue("Software\\\\Wine\\\\Drivers", "Audio", "pulse");
             }
         }
         container.putExtra("audioDriver", audioDriver);
