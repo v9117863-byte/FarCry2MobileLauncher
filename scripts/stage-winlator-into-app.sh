@@ -733,6 +733,21 @@ if "FC2_X11_CLIENT_CONNECTED" not in s:
 p.write_text(s)
 PY
 cp -a "$UPSTREAM/app/src/main/cpp/." "$APP/cpp/"
+# Vortek's native ICD client hardcodes the upstream package's Android socket path
+# in vortek.h; VORTEK_SERVER_PATH is not read by that native client. Rebase it
+# before CMake compiles libvulkan_vortek.so for this application.
+python3 - "$APP/cpp/vortekrenderer/include/vortek.h" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '#define VORTEK_SERVER_PATH "/data/data/com.winlator/files/rootfs/tmp/.vortek/V0"'
+new = '#define VORTEK_SERVER_PATH "/data/data/com.farcry2.mobile/files/rootfs/tmp/.vortek/V0"'
+if old not in s:
+    raise SystemExit("Expected upstream Vortek socket path not found; refusing unsafe native build")
+p.write_text(s.replace(old, new, 1))
+print("VORTEK_NATIVE_SOCKET_PATH=" + new.split('"')[1])
+PY
 # Wine's Xlib connects to the Linux abstract X11 socket before the filesystem
 # socket. The filesystem socket lives inside RootFS, while Wine itself is not
 # chrooted, so /tmp/.X11-unix/X0 on Android cannot reach that RootFS pathname.
