@@ -545,24 +545,24 @@ class MainActivity : Activity() {
                 if (!gameExe.toPath().startsWith(gameRoot.toPath())) {
                     throw IllegalStateException("FarCry2.exe находится вне импортированной папки игры")
                 }
-                // Far Cry 2's optional Ubisoft hardware detector loads OpenGL32
-                // even when the selected renderer is D3D9/DXVK. On this Winlator
-                // WoW64 stack Wine exposes only null_glGetString, after which the
-                // detector jumps into an invalid address (c0000005 at 0x600205f3).
-                // The DLL is dynamically loaded after FarCry2.exe, so temporarily
-                // disable this optional probe and preserve the original for rollback.
+                // Restore the original Ubisoft detector if an earlier launcher build
+                // renamed it. Far Cry 2 still requests this module at startup; leaving
+                // it absent produces STATUS_DLL_NOT_FOUND (c0000135) and can lead to
+                // a NULL call before the game reaches its own initialization.
+                // Keep the backup untouched if both files exist so the user's copy is safe.
                 val systemDetectionDll = File(gameExe.parentFile, "systemdetection.dll")
                 val disabledSystemDetectionDll = File(gameExe.parentFile, "systemdetection.dll.fc2-disabled")
-                if (systemDetectionDll.isFile && !disabledSystemDetectionDll.exists()) {
-                    if (!systemDetectionDll.renameTo(disabledSystemDetectionDll)) {
-                        throw IllegalStateException("Не удалось отключить проблемный systemdetection.dll")
+                if (!systemDetectionDll.isFile && disabledSystemDetectionDll.isFile) {
+                    if (!disabledSystemDetectionDll.renameTo(systemDetectionDll)) {
+                        throw IllegalStateException("Не удалось восстановить systemdetection.dll из резервной копии")
                     }
-                    appendLaunchLog("FC2_SYSTEM_DETECTION disabled=true backup=" + disabledSystemDetectionDll.absolutePath +
-                        " reason=OpenGL_null_glGetString_access_violation")
-                } else if (disabledSystemDetectionDll.isFile) {
-                    appendLaunchLog("FC2_SYSTEM_DETECTION disabled=true backupPresent=true")
+                    appendLaunchLog("FC2_SYSTEM_DETECTION restored=true source=fc2-disabled")
+                } else if (systemDetectionDll.isFile && disabledSystemDetectionDll.isFile) {
+                    appendLaunchLog("FC2_SYSTEM_DETECTION originalPresent=true backupPreserved=true")
+                } else if (systemDetectionDll.isFile) {
+                    appendLaunchLog("FC2_SYSTEM_DETECTION originalPresent=true")
                 } else {
-                    appendLaunchLog("FC2_SYSTEM_DETECTION dllNotFound=true")
+                    appendLaunchLog("FC2_SYSTEM_DETECTION missing=true backupMissing=true")
                 }
                 // Rebuild mappings without stale/duplicate F: entries. Winlator's drive
                 // parser uses the slash before the next drive letter as a separator.
