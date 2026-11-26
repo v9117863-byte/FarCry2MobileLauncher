@@ -715,7 +715,7 @@ class MainActivity : Activity() {
                 container.setDrives(driveMap.toString())
                 container.setScreenSize(resolveRequestedScreenSize())
                 container.setAudioDriver(com.winlator.container.AudioDrivers.PULSEAUDIO)
-                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio; Wine registry will use pulse")
+                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio; Wine registry will use pulse; PulseAudio socket is provided by Winlator XEnvironment")
                 // Far Cry 2 reads its renderer from GamerProfile.xml; seed DX9 before its first run.
                 val fc2ProfileDir = File(container.getUserDir(), "Documents/My Games/Far Cry 2")
                 if (!fc2ProfileDir.isDirectory && !fc2ProfileDir.mkdirs()) {
@@ -853,14 +853,14 @@ class MainActivity : Activity() {
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
                     " customVendorId=unset adapterIdentity=native apitraceMode=False")
-                gameEnv.put("DXVK_LOG_LEVEL", "info")
+                gameEnv.put("DXVK_LOG_LEVEL", "warn")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
-                gameEnv.put("WINEDEBUG", "+process,+loaddll,+module,+seh")
+                gameEnv.put("WINEDEBUG", "-all")
                 container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
                 appendLaunchLog("VULKAN_ICD_FORCE deferred=after-Winlator-driver-extraction")
                 appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=opengl32:builtin-only;d3d10:disabled;d3d10core:disabled;d3d11:disabled;d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
-                appendLaunchLog("DXVK_DIAGNOSTICS level=info path=" + dxvkLogDir.absolutePath + " VK_LOADER_DEBUG=all WINEDEBUG=+loaddll,+seh")
+                appendLaunchLog("DXVK_DIAGNOSTICS level=warn path=" + dxvkLogDir.absolutePath + " WINEDEBUG=disabled-for-runtime-performance")
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
                 val intent = Intent(this@MainActivity, com.winlator.XServerDisplayActivity::class.java).apply {
