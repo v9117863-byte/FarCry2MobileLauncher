@@ -71,6 +71,7 @@ class MainActivity : Activity() {
             override fun chooseRuntimeFolder() = bridge.chooseRuntimeFolder()
             override fun importRuntime() = bridge.importRuntimeFolder()
             override fun chooseMap() = bridge.chooseWorldMap()
+            override fun showMap() = bridge.showWorldMap()
             override fun stopGame() = bridge.stopGame()
             override fun deviceInfo() = bridge.getDeviceInfo()
             override fun gameStatus() = bridge.getGameInstallStatus()
@@ -283,6 +284,61 @@ class MainActivity : Activity() {
                 val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
                 startActivityForResult(intent, requestFolder)
+            }
+        }
+
+        fun showWorldMap() {
+            val imageFile = File(filesDir, "world-map.jpg")
+            if (!imageFile.isFile) {
+                chooseWorldMap()
+                return
+            }
+            runOnUiThread {
+                try {
+                    val bitmap = android.graphics.BitmapFactory.decodeFile(imageFile.absolutePath)
+                        ?: throw IllegalStateException("Не удалось открыть изображение карты")
+                    val dialog = android.app.Dialog(this@MainActivity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+                    val frame = android.widget.FrameLayout(this@MainActivity).apply {
+                        setBackgroundColor(android.graphics.Color.BLACK)
+                    }
+                    val image = android.widget.ImageView(this@MainActivity).apply {
+                        setImageBitmap(bitmap)
+                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                        contentDescription = "Карта Far Cry 2"
+                    }
+                    frame.addView(image, android.widget.FrameLayout.LayoutParams(-1, -1))
+                    val close = android.widget.TextView(this@MainActivity).apply {
+                        text = "✕"
+                        textSize = 24f
+                        setTextColor(android.graphics.Color.WHITE)
+                        gravity = android.view.Gravity.CENTER
+                        setBackgroundColor(0x99000000.toInt())
+                        setPadding(18, 8, 18, 8)
+                        setOnClickListener { dialog.dismiss() }
+                    }
+                    val closeParams = android.widget.FrameLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.Gravity.TOP or android.view.Gravity.END
+                    ).apply { topMargin = 20; rightMargin = 20 }
+                    frame.addView(close, closeParams)
+                    dialog.setContentView(frame)
+                    dialog.show()
+                    dialog.window?.setLayout(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    dialog.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                    dialog.window?.decorView?.systemUiVisibility =
+                        android.view.View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                        android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                        android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                        android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                } catch (error: Exception) {
+                    Toast.makeText(this@MainActivity, error.message ?: "Ошибка открытия карты", Toast.LENGTH_LONG).show()
+                }
             }
         }
 
@@ -658,6 +714,8 @@ class MainActivity : Activity() {
                 driveMap.append("F:").append(gameRoot.absolutePath)
                 container.setDrives(driveMap.toString())
                 container.setScreenSize(resolveRequestedScreenSize())
+                container.setAudioDriver(com.winlator.container.AudioDrivers.PULSEAUDIO)
+                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio; Wine registry will use pulse")
                 // Far Cry 2 reads its renderer from GamerProfile.xml; seed DX9 before its first run.
                 val fc2ProfileDir = File(container.getUserDir(), "Documents/My Games/Far Cry 2")
                 if (!fc2ProfileDir.isDirectory && !fc2ProfileDir.mkdirs()) {
@@ -671,7 +729,7 @@ class MainActivity : Activity() {
                     fc2Profile.writeText(
                         """<GamerProfile>
 <SoundProfile MusicEnabled="1" MasterVolume="100"/>
-<RenderProfile MultiSampleMode="0" AlphaToCoverage="0" ResolutionX="$profileWidth" ResolutionY="$profileHeight" Quality="custom" Fullscreen="0" Maximized="0" ForceWidescreen="1" AspectRatio="0" VSync="0" RefreshRate="60" DisableMip0Loading="0" MaxDriverBufferedFrames="0" Platform="d3d9" ShowFPS="0" ClustersZPassMaxLOD="1" Brightness="1" Contrast="1" GammaRamp="1" GammaRampR="1" GammaRampG="1" GammaRampB="1" AllowAsynchShaderLoading="1">
+<RenderProfile MultiSampleMode="0" AlphaToCoverage="0" ResolutionX="$profileWidth" ResolutionY="$profileHeight" Quality="custom" Fullscreen="1" Maximized="1" ForceWidescreen="1" AspectRatio="0" VSync="0" RefreshRate="60" DisableMip0Loading="0" MaxDriverBufferedFrames="0" Platform="d3d9" ShowFPS="0" ClustersZPassMaxLOD="1" Brightness="1" Contrast="1" GammaRamp="1" GammaRampR="1" GammaRampG="1" GammaRampB="1" AllowAsynchShaderLoading="1">
 <CustomQuality><quality ResolutionX="$profileWidth" ResolutionY="$profileHeight" EnvironmentQuality="low" AntiPortalQuality="high" PostFxQuality="low" TextureQuality="low" TextureResolutionQuality="low" WaterQuality="low" DepthPassQuality="high" VegetationQuality="low" TerrainQuality="low" GeometryQuality="low" AmbientQuality="low" ShadowQuality="off" Hdr="0" HdrFP32="0" Bloom="0" id="custom"/></CustomQuality>
 </RenderProfile>
 <NetworkProfile CustomMapMaxUploadRateOnline="10240" OnlineEnginePort="9000" OnlineServicePort="9001" FileTransferHostPort="9002" FileTransferClientPort="9003" LanBroadcastPort="9004" ScanFreePorts="1" ScanPortRange="1000" ScanPortStart="9000" SessionProvider="" DetectPublicAddress="1" MaxUploadOnline="768"><Accounts/></NetworkProfile>
@@ -692,8 +750,8 @@ class MainActivity : Activity() {
                     var renderAttrs = match.value
                     val forcedAttrs = linkedMapOf(
                         "Platform" to "d3d9",
-                        "Fullscreen" to "0",
-                        "Maximized" to "0",
+                        "Fullscreen" to "1",
+                        "Maximized" to "1",
                         "ResolutionX" to profileWidth.toString(),
                         "ResolutionY" to profileHeight.toString(),
                         "VSync" to "0",
@@ -828,7 +886,7 @@ class MainActivity : Activity() {
             val settings = try {
                 prefs.getString("launch_settings", null)?.let { JSONObject(it) }
             } catch (_: Exception) { null }
-            return when (settings?.optString("resolution", "540p") ?: "540p") {
+            return when (settings?.optString("resolution", "Native") ?: "Native") {
                 "480p" -> "854x480"
                 "600p" -> "1066x600"
                 "720p" -> "1280x720"
