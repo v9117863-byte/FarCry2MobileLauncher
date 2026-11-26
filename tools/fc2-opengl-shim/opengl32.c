@@ -36,7 +36,7 @@ __declspec(dllexport) const GLubyte * WINAPI glGetString(GLenum name) {
 
 __declspec(dllexport) HGLRC WINAPI wglCreateContext(HDC deviceContext) {
     (void)deviceContext;
-    return (HGLRC)(ULONG_PTR)0x1234;
+    return (HGLRC)(unsigned long)0x1234;
 }
 
 __declspec(dllexport) BOOL WINAPI wglDeleteContext(HGLRC context) {
