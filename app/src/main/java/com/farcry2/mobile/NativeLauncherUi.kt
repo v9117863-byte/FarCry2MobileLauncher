@@ -234,7 +234,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         val elements = try { org.json.JSONArray(actions.loadControlLayout()) } catch (_: Exception) { org.json.JSONArray() }
         val preview = ControlEditorCanvas(activity, elements)
         body.addView(text("ПЕРЕТАСКИВАЙ КНОПКИ. ДВОЙНОЕ НАЖАТИЕ — УВЕЛИЧИТЬ.", 10f, cream, true))
-        body.addView(preview, LinearLayout.LayoutParams(-1, 0, 1f).apply {
+        body.addView(preview, LinearLayout.LayoutParams(-1, dp(220)).apply {
             topMargin = dp(8)
             bottomMargin = dp(8)
         })
