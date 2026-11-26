@@ -10,6 +10,33 @@ fi
 mkdir -p "$APP/java" "$APP/cpp" "$APP/res" "$APP/assets"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
+# A malformed token in the saved Winlator environment (for example a bare
+# three-character value without '=') crashes EnvVars.putAll before XServer/Wine
+# starts. Ignore malformed tokens and record a diagnostic instead of aborting
+# the entire game launch.
+python3 - "$APP/java/com/winlator/core/EnvVars.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = """            int index = item.indexOf("=");
+            String name = item.substring(0, index);
+            String value = item.substring(index+1);
+            data.put(name, value);"""
+new = """            int index = item.indexOf("=");
+            if (index <= 0) {
+                android.util.Log.e("FarCry2Diagnostics",
+                    "ENVVARS_SKIP_MALFORMED tokenLength=" + item.length() + " token=" + item);
+                continue;
+            }
+            String name = item.substring(0, index);
+            String value = item.substring(index+1);
+            data.put(name, value);"""
+if "ENVVARS_SKIP_MALFORMED" not in s:
+    if old not in s: raise SystemExit("EnvVars.putAll parser marker not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
 # Upstream caches the selected graphics driver in SharedPreferences before extraction.
 # If RootFS was recreated or extraction was interrupted, that stale cache suppresses
 # Vortek's Vulkan ICD on the next launch. Validate the actual installed payload and only
