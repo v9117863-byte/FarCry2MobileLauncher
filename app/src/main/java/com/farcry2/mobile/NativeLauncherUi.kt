@@ -234,7 +234,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         currentPage = "control-editor"
         heading("CONTROL LAYOUT", "DRAG TO MOVE  /  DOUBLE TAP TO RESIZE")
         val elements = try { org.json.JSONArray(actions.loadControlLayout()) } catch (_: Exception) { org.json.JSONArray() }
-        val preview = ControlEditorCanvas(activity, elements)
+        val preview = ControlEditorCanvas(activity, elements) { actions.saveControlLayout(elements.toString()) }
         body.addView(text("ПЕРЕТАСКИВАЙ КНОПКИ. ДВОЙНОЕ НАЖАТИЕ — УВЕЛИЧИТЬ.", 10f, cream, true))
         body.addView(preview, LinearLayout.LayoutParams(-1, dp(220)).apply {
             topMargin = dp(8)
@@ -244,7 +244,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             showFullscreenControlEditor(elements, preview)
         })
         val addRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val choices = listOf("FIRE", "AIM", "RELOAD", "JUMP", "USE", "CROUCH", "MAP")
+        val choices = listOf("FIRE", "AIM", "RELOAD", "JUMP", "USE", "CROUCH", "MAP", "GRENADE", "MELEE", "WEAPON")
         val choice = spinner(choices, "RELOAD")
         addRow.addView(choice, LinearLayout.LayoutParams(0, dp(44), 1f))
         addRow.addView(button("＋ ДОБАВИТЬ") {
@@ -278,6 +278,9 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             "JUMP" -> arrayOf("KEY_SPACE", "NONE", "NONE", "NONE")
             "USE" -> arrayOf("KEY_E", "NONE", "NONE", "NONE")
             "CROUCH" -> arrayOf("KEY_CTRL_L", "NONE", "NONE", "NONE")
+            "GRENADE" -> arrayOf("KEY_G", "NONE", "NONE", "NONE")
+            "MELEE" -> arrayOf("KEY_V", "NONE", "NONE", "NONE")
+            "WEAPON" -> arrayOf("KEY_1", "NONE", "NONE", "NONE")
             else -> arrayOf("KEY_M", "NONE", "NONE", "NONE")
         }
         val iconId = when (action) {
@@ -287,6 +290,9 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             "JUMP" -> 4
             "USE" -> 5
             "CROUCH" -> 7
+            "GRENADE" -> 0
+            "MELEE" -> 0
+            "WEAPON" -> 0
             else -> 8
         }
         elements.put(JSONObject().put("type", "BUTTON").put("shape", "CIRCLE")
@@ -304,7 +310,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         }
         val caption = text("ПОЛНЫЙ ЭКРАН — ПЕРЕТАСКИВАЙ КНОПКИ ДЛЯ ТОЧНОЙ НАСТРОЙКИ", 12f, cream, true)
         layout.addView(caption, LinearLayout.LayoutParams(-1, dp(38)))
-        val largePreview = ControlEditorCanvas(activity, elements)
+        val largePreview = ControlEditorCanvas(activity, elements) { actions.saveControlLayout(elements.toString()) }
         layout.addView(largePreview, LinearLayout.LayoutParams(-1, 0, 1f).apply {
             topMargin = dp(6); bottomMargin = dp(8)
         })
@@ -337,7 +343,8 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
 
     private class ControlEditorCanvas(
         context: Activity,
-        private val elements: org.json.JSONArray
+        private val elements: org.json.JSONArray,
+        private val onLayoutChanged: (() -> Unit)? = null
     ) : View(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         var selectedIndex = -1
@@ -437,6 +444,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
                         if(dragging==lastTapIndex && now-lastTapAt<320L){
                             val item=elements.optJSONObject(dragging)
                             item?.put("scale",(item.optDouble("scale",0.9)+0.1).coerceAtMost(1.6))
+                            onLayoutChanged?.invoke()
                             lastTapIndex=-1
                         } else {lastTapIndex=dragging;lastTapAt=now}
                     }
@@ -451,7 +459,8 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
                     item.put("y",((oldY+dy)/h).coerceIn(0.08f,0.92f))
                     downX=event.x; downY=event.y; invalidate(); return true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {dragging=-1;return true}
+                MotionEvent.ACTION_UP -> { dragging=-1; onLayoutChanged?.invoke(); return true }
+                MotionEvent.ACTION_CANCEL -> { dragging=-1; return true }
             }
             return true
         }
