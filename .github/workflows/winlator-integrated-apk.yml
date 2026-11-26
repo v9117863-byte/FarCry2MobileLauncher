@@ -54,6 +54,14 @@ jobs:
             fi
           done
           exit 1
+      - name: Verify Box64 is packaged as executable ARM64 JNI library
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          unzip -Z1 "$APK" | grep -Fx 'lib/arm64-v8a/libbox64.so'
+          unzip -p "$APK" lib/arm64-v8a/libbox64.so > /tmp/libbox64.so
+          file /tmp/libbox64.so
+          readelf -h /tmp/libbox64.so | grep -E 'Class:|Machine:'
+          readelf -l /tmp/libbox64.so | grep 'Requesting program interpreter'
       - name: Upload experimental APK
         uses: actions/upload-artifact@v4
         with:
