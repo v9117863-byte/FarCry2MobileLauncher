@@ -17,6 +17,39 @@ i686-w64-mingw32-gcc -shared -O2 -s -Wl,--kill-at \
 file "$APP/assets/fc2-compat/opengl32.dll"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
+# Always synchronize Wine's registry with the selected audio backend. The upstream
+# implementation trusts a cached container extra and can leave user.reg on ALSA.
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+start = s.find("    private void changeWineAudioDriver() {")
+end = s.find("\n    private void applyGeneralPatches", start)
+if start < 0 or end < 0:
+    raise SystemExit("changeWineAudioDriver method boundaries not found")
+method = """    private void changeWineAudioDriver() {
+        File rootDir = rootFS.getRootDir();
+        File userRegFile = new File(rootDir, RootFS.WINEPREFIX+"/user.reg");
+        try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
+            if (audioDriver.equals(AudioDrivers.ALSA)) {
+                registryEditor.setStringValue("Software\\Wine\\Drivers", "Audio", "alsa");
+            }
+            else if (audioDriver.equals(AudioDrivers.PULSEAUDIO)) {
+                registryEditor.setStringValue("Software\\Wine\\Drivers", "Audio", "pulse");
+            }
+        }
+        container.putExtra("audioDriver", audioDriver);
+        container.saveData();
+        com.winlator.core.ProcessHelper.appendDiagnosticLine(
+            "WINE_AUDIO_BACKEND_APPLIED backend=" + audioDriver +
+            " registry=" + (audioDriver.equals(AudioDrivers.PULSEAUDIO) ? "pulse" : "alsa"));
+    }
+"""
+s = s[:start] + method + s[end:]
+p.write_text(s)
+PY
+
 # Render a distinct upstream PNG texture and retain the action label on every button.
 python3 - "$APP/java/com/winlator/inputcontrols/ControlElement.java" <<'PY'
 from pathlib import Path
