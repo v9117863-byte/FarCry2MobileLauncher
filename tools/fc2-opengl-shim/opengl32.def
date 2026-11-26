@@ -1,4 +1,4 @@
-LIBRARY opengl32
+LIBRARY fcopengl
 EXPORTS
     glGetString=_glGetString@4
     wglCreateContext=_wglCreateContext@4
