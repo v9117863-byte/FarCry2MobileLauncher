@@ -25,6 +25,7 @@ import androidx.documentfile.provider.DocumentFile
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
 import com.winlator.core.TarCompressorUtils
+import com.winlator.core.ProcessHelper
 import com.winlator.core.GeneralComponents
 import com.winlator.core.DefaultVersion
 import com.winlator.xenvironment.RootFS
@@ -52,6 +53,14 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // ProcessHelper launches Box64 from PackageManager's executable JNI directory.
+        // This setter is injected into the pinned upstream ProcessHelper by the staging script.
+        val nativeDir = applicationInfo.nativeLibraryDir
+        ProcessHelper.setNativeLibraryDir(nativeDir)
+        val packagedBox64 = File(nativeDir, "libbox64.so")
+        appendLaunchLog("BOX64_NATIVE_LIBRARY_DIR path=" + nativeDir +
+            " exists=" + packagedBox64.isFile + " executable=" + packagedBox64.canExecute() +
+            " size=" + packagedBox64.length())
         selectedTree = prefs.getString("game_tree_uri", null)?.let(Uri::parse)
         val bridge = AndroidBridge()
         nativeUi = NativeLauncherUi(this, object : NativeLauncherUi.Actions {
