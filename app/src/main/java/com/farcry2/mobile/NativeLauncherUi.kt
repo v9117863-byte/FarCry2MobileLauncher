@@ -206,7 +206,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         currentPage = "settings"
         heading("OPTIONS", "GAME AND SYSTEM SETTINGS")
         section("Экран")
-        val resolution = spinner(listOf("480p", "540p", "600p", "720p", "Native"), "540p")
+        val resolution = spinner(listOf("480p", "540p", "600p", "720p", "Native"), "Native")
         body.addView(text("Разрешение игрового экрана", 12f, Color.WHITE)); body.addView(resolution)
         section("Графика")
         val driver = spinner(listOf("Системный", "Turnip", "VirGL"), "Системный")
@@ -280,10 +280,19 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             "CROUCH" -> arrayOf("KEY_CTRL_L", "NONE", "NONE", "NONE")
             else -> arrayOf("KEY_M", "NONE", "NONE", "NONE")
         }
+        val iconId = when (action) {
+            "FIRE" -> 1
+            "AIM" -> 2
+            "RELOAD" -> 3
+            "JUMP" -> 4
+            "USE" -> 5
+            "CROUCH" -> 7
+            else -> 8
+        }
         elements.put(JSONObject().put("type", "BUTTON").put("shape", "CIRCLE")
             .put("bindings", org.json.JSONArray(spec)).put("scale", 0.9)
             .put("x", 0.5).put("y", 0.5).put("toggleSwitch", false)
-            .put("text", action).put("iconId", 0))
+            .put("text", action).put("iconId", iconId))
     }
 
     private fun showFullscreenControlEditor(elements: org.json.JSONArray, mainPreview: ControlEditorCanvas) {
