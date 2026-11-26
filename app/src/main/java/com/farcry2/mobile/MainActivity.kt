@@ -652,7 +652,7 @@ class MainActivity : Activity() {
                     val lineIndex = dxvkConfigLines.indexOfFirst {
                         it.substringBefore("=").trim().equals(key, ignoreCase = true)
                     }
-                    val setting = "$" + "{key} = $" + "{value}"
+                    val setting = key + " = " + value
                     if (lineIndex >= 0) dxvkConfigLines[lineIndex] = setting
                     else dxvkConfigLines.add(setting)
                 }
