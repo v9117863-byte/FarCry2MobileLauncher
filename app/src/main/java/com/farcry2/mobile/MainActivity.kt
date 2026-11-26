@@ -617,6 +617,26 @@ class MainActivity : Activity() {
                         throw IllegalStateException("Не удалось установить исправленный systemdetection.dll")
                     }
                 }
+                // Clean up the legacy global opengl32 shim from earlier builds.
+                // Restore the user's original DLL when one was backed up; otherwise
+                // remove only the known shim we installed, never an unknown game DLL.
+                val legacyOpenGL = File(gameExe.parentFile, "opengl32.dll")
+                val legacyOpenGLBackup = File(gameExe.parentFile, "opengl32.dll.fc2-original")
+                val isLegacyProbe = legacyOpenGL.isFile && try {
+                    String(legacyOpenGL.readBytes(), Charsets.ISO_8859_1)
+                        .contains("Far Cry 2 compatibility probe")
+                } catch (_: Exception) { false }
+                if (isLegacyProbe) {
+                    if (legacyOpenGLBackup.isFile) {
+                        legacyOpenGLBackup.copyTo(legacyOpenGL, overwrite = true)
+                        appendLaunchLog("FC2_OPENGL_SHIM legacyRemoved=true originalRestored=true")
+                    } else {
+                        if (!legacyOpenGL.delete()) {
+                            throw IllegalStateException("Не удалось удалить старый OpenGL probe shim")
+                        }
+                        appendLaunchLog("FC2_OPENGL_SHIM legacyRemoved=true originalRestored=false")
+                    }
+                }
                 val privateOpenGLShim = File(gameExe.parentFile, "fcopengl.dll")
                 assets.open("fc2-compat/fcopengl.dll").use { input ->
                     FileOutputStream(privateOpenGLShim, false).use { output -> input.copyTo(output) }
