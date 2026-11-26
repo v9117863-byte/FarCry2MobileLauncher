@@ -43,7 +43,7 @@ jobs:
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;24.0.8215888" "cmake;3.22.1" "platforms;android-35" "build-tools;35.0.0"
       - name: Install runtime staging utilities
-        run: sudo apt-get update && sudo apt-get install -y zstd patchelf gcc-aarch64-linux-gnu i686-w64-mingw32-gcc libvulkan-dev libx11-dev
+        run: sudo apt-get update && sudo apt-get install -y zstd patchelf gcc-aarch64-linux-gnu gcc-mingw-w64-i686 libvulkan-dev libx11-dev
       - name: Stage Winlator Java, native, JNI, resources and offline assets
         run: bash scripts/stage-winlator-into-app.sh .ci/winlator-upstream .ci/vortek-upstream
       - name: Build merged Android APK
