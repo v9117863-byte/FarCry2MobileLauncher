@@ -239,7 +239,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             bottomMargin = dp(8)
         })
         body.addView(button("РАЗВЕРНУТЬ РЕДАКТОР НА ВЕСЬ ЭКРАН", true) {
-            showFullscreenControlEditor(elements)
+            showFullscreenControlEditor(elements, preview)
         })
         val addRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         val choices = listOf("FIRE", "AIM", "RELOAD", "JUMP", "USE", "CROUCH", "MAP")
@@ -284,7 +284,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             .put("text", action).put("iconId", 0))
     }
 
-    private fun showFullscreenControlEditor(elements: org.json.JSONArray) {
+    private fun showFullscreenControlEditor(elements: org.json.JSONArray, mainPreview: ControlEditorCanvas) {
         val dialog = android.app.Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         val layout = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
@@ -314,7 +314,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             message("Раскладка сохранена")
         }.apply { layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f) })
         controls.addView(button("ГОТОВО") {
-            previewRefreshAfterDialog(elements)
+            mainPreview.invalidate()
             dialog.dismiss()
         }.apply { layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f) })
         layout.addView(controls)
@@ -322,11 +322,6 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         dialog.show()
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-    }
-
-    private fun previewRefreshAfterDialog(elements: org.json.JSONArray) {
-        // The main editor is recreated from the persisted layout when reopened.
-        message("Изменения редактора готовы к сохранению")
     }
 
     private class ControlEditorCanvas(
