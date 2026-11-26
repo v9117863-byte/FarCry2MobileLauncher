@@ -250,17 +250,19 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         addRow.addView(button("＋ ДОБАВИТЬ") {
             val action = choice.selectedItem?.toString() ?: "RELOAD"
             addControlElement(elements, action)
+            actions.saveControlLayout(elements.toString())
             preview.invalidate()
-            message("$action добавлена")
+            message("$action добавлена и сохранена")
         }.apply { layoutParams = LinearLayout.LayoutParams(dp(116), dp(44)) })
         body.addView(addRow)
         body.addView(button("УДАЛИТЬ ВЫБРАННУЮ") {
             val selected = preview.selectedIndex
             if (selected >= 0 && selected < elements.length()) {
                 elements.remove(selected)
+                actions.saveControlLayout(elements.toString())
                 preview.selectedIndex = -1
                 preview.invalidate()
-                message("Кнопка удалена")
+                message("Кнопка удалена и раскладка сохранена")
             } else message("Сначала выбери кнопку на поле")
         })
         body.addView(button("СОХРАНИТЬ РАСКЛАДКУ", true) {
@@ -322,6 +324,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             val selected = largePreview.selectedIndex
             if (selected in 0 until elements.length()) {
                 elements.remove(selected)
+                actions.saveControlLayout(elements.toString())
                 largePreview.selectedIndex = -1
                 largePreview.invalidate()
             } else message("Сначала выбери кнопку")
