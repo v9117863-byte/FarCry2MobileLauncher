@@ -948,12 +948,26 @@ class MainActivity : Activity() {
                     profile.outputStream().use { input.copyTo(it) }
                 }
                 val data = JSONObject(profile.readText(Charsets.UTF_8))
-                // The cursor remains visible as requested; preserve that across editor saves.
+                // Preserve the visible mouse cursor and upgrade old layouts with distinct action textures.
+                var changed = false
                 if (data.optBoolean("hideMouseCursor", false)) {
                     data.put("hideMouseCursor", false)
-                    profile.writeText(data.toString(), Charsets.UTF_8)
+                    changed = true
                 }
-                data.optJSONArray("elements")?.toString() ?: "[]"
+                val elements = data.optJSONArray("elements")
+                if (elements != null) {
+                    val iconIds = mapOf("FIRE" to 1, "AIM" to 2, "RELOAD" to 3, "JUMP" to 4, "USE" to 5, "RUN" to 6, "CROUCH" to 7, "MENU" to 8, "MAP" to 9)
+                    for (i in 0 until elements.length()) {
+                        val item = elements.optJSONObject(i) ?: continue
+                        val iconId = iconIds[item.optString("text").uppercase()] ?: 0
+                        if (iconId > 0 && item.optInt("iconId", 0) == 0) {
+                            item.put("iconId", iconId)
+                            changed = true
+                        }
+                    }
+                }
+                if (changed) profile.writeText(data.toString(), Charsets.UTF_8)
+                elements?.toString() ?: "[]"
             } catch (error: Exception) {
                 appendLaunchLog("CONTROL_LAYOUT_READ_ERROR " + error)
                 "[]"
