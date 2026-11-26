@@ -297,9 +297,14 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             "WEAPON" -> 0
             else -> 8
         }
+        val slot = (elements.length() - 8).coerceAtLeast(0)
+        val column = slot % 4
+        val row = (slot / 4) % 3
+        val x = (0.34 + column * 0.16).coerceIn(0.08, 0.92)
+        val y = (0.30 + row * 0.16).coerceIn(0.12, 0.88)
         elements.put(JSONObject().put("type", "BUTTON").put("shape", "CIRCLE")
             .put("bindings", org.json.JSONArray(spec)).put("scale", 0.9)
-            .put("x", 0.5).put("y", 0.5).put("toggleSwitch", false)
+            .put("x", x).put("y", y).put("toggleSwitch", false)
             .put("text", action).put("iconId", iconId))
     }
 
