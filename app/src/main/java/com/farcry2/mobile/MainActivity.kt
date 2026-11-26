@@ -564,6 +564,32 @@ class MainActivity : Activity() {
                 } else {
                     appendLaunchLog("FC2_SYSTEM_DETECTION missing=true backupMissing=true")
                 }
+
+                // Ubisoft's detector imports OpenGL32 and calls glGetString before
+                // Far Cry 2 creates its DX9 device. Wine's null OpenGL context crashes
+                // on that probe even though DXVK/Vulkan are already available.
+                // Install a game-local probe shim; preserve any pre-existing DLL.
+                val openglShim = File(gameExe.parentFile, "opengl32.dll")
+                val openglBackup = File(gameExe.parentFile, "opengl32.dll.fc2-original")
+                val existingIsShim = openglShim.isFile && try {
+                    String(openglShim.readBytes(), Charsets.ISO_8859_1)
+                        .contains("Far Cry 2 compatibility probe")
+                } catch (_: Exception) { false }
+                if (openglShim.isFile && !existingIsShim && !openglBackup.exists()) {
+                    if (!openglShim.renameTo(openglBackup)) {
+                        throw IllegalStateException("Не удалось сохранить исходный opengl32.dll")
+                    }
+                    appendLaunchLog("FC2_OPENGL_SHIM originalBackedUp=true")
+                }
+                assets.open("fc2-compat/opengl32.dll").use { input ->
+                    FileOutputStream(openglShim, false).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                appendLaunchLog("FC2_OPENGL_SHIM installed=" + openglShim.absolutePath +
+                    " originalBackup=" + openglBackup.isFile +
+                    " mode=hardware-probe-only renderer=DXVK-Vulkan")
+
                 // Rebuild mappings without stale/duplicate F: entries. Winlator's drive
                 // parser uses the slash before the next drive letter as a separator.
                 val driveMap = StringBuilder()
@@ -676,7 +702,7 @@ class MainActivity : Activity() {
                 gameEnv.put("WINEESYNC", "0")
                 gameEnv.put("WINEFSYNC", "0")
                 // Explicitly prefer DXVK's native D3D9/DXGI DLLs for this 32-bit game.
-                gameEnv.put("WINEDLLOVERRIDES", "d3d10=disabled;d3d10core=disabled;d3d11=disabled;d3d9=n,b;dxgi=n,b")
+                gameEnv.put("WINEDLLOVERRIDES", "opengl32=n,b;d3d10=disabled;d3d10core=disabled;d3d11=disabled;d3d9=n,b;dxgi=n,b")
                 // Force the Vortek ICD instead of relying on implicit Vulkan loader
                 // discovery. Without this, Box64 can load libvulkan.so.1 while the
                 // loader silently ignores the guest ICD; DXVK then reports that the
@@ -718,7 +744,7 @@ class MainActivity : Activity() {
                 container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
                 appendLaunchLog("VULKAN_ICD_FORCE deferred=after-Winlator-driver-extraction")
-                appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=d3d10:disabled;d3d10core:disabled;d3d11:disabled;d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
+                appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=opengl32:n,b;d3d10:disabled;d3d10core:disabled;d3d11:disabled;d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
                 appendLaunchLog("DXVK_DIAGNOSTICS level=info path=" + dxvkLogDir.absolutePath + " VK_LOADER_DEBUG=all WINEDEBUG=+loaddll,+seh")
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
