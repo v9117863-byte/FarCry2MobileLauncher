@@ -395,8 +395,24 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
                 paint.color = Color.WHITE
                 paint.textAlign = Paint.Align.CENTER
                 paint.typeface = Typeface.create("sans-serif-condensed",Typeface.BOLD)
-                paint.textSize = (if (radius > 30f*density) 10f else 9f)*density
-                canvas.drawText(label.take(8),x,y+3.5f*density,paint)
+                val glyph = when (label.uppercase()) {
+                    "FIRE" -> "✦"
+                    "AIM" -> "◎"
+                    "RELOAD" -> "↻"
+                    "JUMP" -> "↑"
+                    "USE" -> "E"
+                    "RUN" -> "»"
+                    "CROUCH" -> "↓"
+                    "MENU" -> "☰"
+                    "MAP" -> "⌖"
+                    "MOVE" -> "✣"
+                    "LOOK" -> "◉"
+                    else -> "•"
+                }
+                paint.textSize = radius * 0.72f
+                canvas.drawText(glyph, x, y - radius * 0.08f, paint)
+                paint.textSize = (if (radius > 30f*density) 8f else 7f)*density
+                canvas.drawText(label.take(8),x,y+radius*0.52f,paint)
             }
         }
 
