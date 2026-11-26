@@ -565,30 +565,65 @@ class MainActivity : Activity() {
                     appendLaunchLog("FC2_SYSTEM_DETECTION missing=true backupMissing=true")
                 }
 
-                // Ubisoft's detector imports OpenGL32 and calls glGetString before
-                // Far Cry 2 creates its DX9 device. Wine's null OpenGL context crashes
-                // on that probe even though DXVK/Vulkan are already available.
-                // Install a game-local probe shim; preserve any pre-existing DLL.
-                val openglShim = File(gameExe.parentFile, "opengl32.dll")
-                val openglBackup = File(gameExe.parentFile, "opengl32.dll.fc2-original")
-                val existingIsShim = openglShim.isFile && try {
-                    String(openglShim.readBytes(), Charsets.ISO_8859_1)
-                        .contains("Far Cry 2 compatibility probe")
-                } catch (_: Exception) { false }
-                if (openglShim.isFile && !existingIsShim && !openglBackup.exists()) {
-                    if (!openglShim.renameTo(openglBackup)) {
-                        throw IllegalStateException("Не удалось сохранить исходный opengl32.dll")
-                    }
-                    appendLaunchLog("FC2_OPENGL_SHIM originalBackedUp=true")
+                // Patch only Ubisoft's hardware detector to import a private probe DLL.
+                // Never install a game-local opengl32.dll: Wine loads that module globally,
+                // so it would also shadow Wine's real OpenGL implementation for wined3d.
+                // The private DLL is named fcopengl.dll; the PE import name replacement
+                // is same-length and affects only systemdetection.dll.
+                if (!systemDetectionDll.isFile) {
+                    throw IllegalStateException("systemdetection.dll отсутствует; OpenGL probe patch невозможен")
                 }
-                assets.open("fc2-compat/opengl32.dll").use { input ->
-                    FileOutputStream(openglShim, false).use { output ->
-                        input.copyTo(output)
+                val systemDetectionBackup = File(gameExe.parentFile, "systemdetection.dll.fc2-original")
+                if (!systemDetectionBackup.isFile) {
+                    systemDetectionDll.copyTo(systemDetectionBackup, overwrite = false)
+                    appendLaunchLog("FC2_SYSTEM_DETECTION backupCreated=true")
+                }
+                val detectorBytes = systemDetectionDll.readBytes()
+                val oldImport = "OPENGL32.dll".toByteArray(Charsets.US_ASCII)
+                val newImport = "fcopengl.dll".toByteArray(Charsets.US_ASCII)
+                if (oldImport.size != newImport.size) {
+                    throw IllegalStateException("Некорректная длина имени OpenGL import")
+                }
+                var patchedImports = 0
+                var pos = 0
+                while (pos <= detectorBytes.size - oldImport.size) {
+                    var matches = true
+                    for (j in oldImport.indices) {
+                        val actual = detectorBytes[pos + j].toInt() and 0xff
+                        val expected = oldImport[j].toInt() and 0xff
+                        if (actual != expected && actual != (expected or 0x20)) {
+                            matches = false
+                            break
+                        }
+                    }
+                    if (matches) {
+                        System.arraycopy(newImport, 0, detectorBytes, pos, newImport.size)
+                        patchedImports++
+                        pos += oldImport.size
+                    } else {
+                        pos++
                     }
                 }
-                appendLaunchLog("FC2_OPENGL_SHIM installed=" + openglShim.absolutePath +
-                    " originalBackup=" + openglBackup.isFile +
-                    " mode=hardware-probe-only renderer=DXVK-Vulkan")
+                if (patchedImports == 0 && !String(detectorBytes, Charsets.ISO_8859_1).contains("fcopengl.dll")) {
+                    throw IllegalStateException("В systemdetection.dll не найден импорт OPENGL32.dll")
+                }
+                if (patchedImports > 0) {
+                    val patchedTemp = File(gameExe.parentFile, "systemdetection.dll.fc2-patched")
+                    FileOutputStream(patchedTemp, false).use { it.write(detectorBytes) }
+                    if (systemDetectionDll.exists() && !systemDetectionDll.delete()) {
+                        throw IllegalStateException("Не удалось заменить systemdetection.dll")
+                    }
+                    if (!patchedTemp.renameTo(systemDetectionDll)) {
+                        throw IllegalStateException("Не удалось установить исправленный systemdetection.dll")
+                    }
+                }
+                val privateOpenGLShim = File(gameExe.parentFile, "fcopengl.dll")
+                assets.open("fc2-compat/fcopengl.dll").use { input ->
+                    FileOutputStream(privateOpenGLShim, false).use { output -> input.copyTo(output) }
+                }
+                appendLaunchLog("FC2_OPENGL_SHIM installed=" + privateOpenGLShim.absolutePath +
+                    " importPatched=" + patchedImports + " detectorBackup=" + systemDetectionBackup.isFile +
+                    " scope=systemdetection-only renderer=DXVK-Vulkan")
 
                 // Rebuild mappings without stale/duplicate F: entries. Winlator's drive
                 // parser uses the slash before the next drive letter as a separator.
@@ -702,7 +737,7 @@ class MainActivity : Activity() {
                 gameEnv.put("WINEESYNC", "0")
                 gameEnv.put("WINEFSYNC", "0")
                 // Explicitly prefer DXVK's native D3D9/DXGI DLLs for this 32-bit game.
-                gameEnv.put("WINEDLLOVERRIDES", "opengl32=n,b;d3d10=disabled;d3d10core=disabled;d3d11=disabled;d3d9=n,b;dxgi=n,b")
+                gameEnv.put("WINEDLLOVERRIDES", "d3d10=disabled;d3d10core=disabled;d3d11=disabled;d3d9=n,b;dxgi=n,b")
                 // Force the Vortek ICD instead of relying on implicit Vulkan loader
                 // discovery. Without this, Box64 can load libvulkan.so.1 while the
                 // loader silently ignores the guest ICD; DXVK then reports that the
@@ -744,7 +779,7 @@ class MainActivity : Activity() {
                 container.setEnvVars(gameEnv.toString())
                 appendLaunchLog("GRAPHICS_DRIVER requested=$requestedDriver applied=$graphicsDriver")
                 appendLaunchLog("VULKAN_ICD_FORCE deferred=after-Winlator-driver-extraction")
-                appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=opengl32:n,b;d3d10:disabled;d3d10core:disabled;d3d11:disabled;d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
+                appendLaunchLog("DX9_COMPATIBILITY wrapper=dxvk overrides=opengl32:default;d3d10:disabled;d3d10core:disabled;d3d11:disabled;d3d9:n,b;dxgi:n,b env=WINEESYNC:0,WINEFSYNC:0")
                 appendLaunchLog("DXVK_DIAGNOSTICS level=info path=" + dxvkLogDir.absolutePath + " VK_LOADER_DEBUG=all WINEDEBUG=+loaddll,+seh")
                 container.saveData()
                 prefs.edit().putInt("winlator_container_id", container.id).apply()
