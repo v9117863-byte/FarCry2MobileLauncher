@@ -694,22 +694,24 @@ class MainActivity : Activity() {
                 val dxvkConfigLines = if (dxvkConfigFile.isFile)
                     dxvkConfigFile.readLines(Charsets.UTF_8).toMutableList()
                 else mutableListOf<String>()
-                val fc2DxvkOptions = linkedMapOf(
-                    "d3d9.customVendorId" to "10de",
-                    "d3d9.apitraceMode" to "False"
-                )
-                for ((key, value) in fc2DxvkOptions) {
-                    val lineIndex = dxvkConfigLines.indexOfFirst {
-                        it.substringBefore("=").trim().equals(key, ignoreCase = true)
-                    }
-                    val setting = key + " = " + value
-                    if (lineIndex >= 0) dxvkConfigLines[lineIndex] = setting
-                    else dxvkConfigLines.add(setting)
+                // Do not spoof the Adreno GPU as NVIDIA. Far Cry 2's hardware
+                // detector reads adapter identity and can select an incompatible
+                // capability/profile path when DXVK reports vendor 0x10de.
+                // Remove any stale override from previous launcher runs and let
+                // DXVK expose the real Vulkan adapter vendor/device identifiers.
+                dxvkConfigLines.removeAll {
+                    it.substringBefore("=").trim().equals("d3d9.customVendorId", ignoreCase = true)
                 }
+                val apitraceKey = "d3d9.apitraceMode"
+                val apitraceIndex = dxvkConfigLines.indexOfFirst {
+                    it.substringBefore("=").trim().equals(apitraceKey, ignoreCase = true)
+                }
+                if (apitraceIndex >= 0) dxvkConfigLines[apitraceIndex] = "$apitraceKey = False"
+                else dxvkConfigLines.add("$apitraceKey = False")
                 dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
-                    " customVendorId=10de apitraceMode=False")
+                    " customVendorId=unset adapterIdentity=native apitraceMode=False")
                 gameEnv.put("DXVK_LOG_LEVEL", "info")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "+process,+loaddll,+module,+seh")
