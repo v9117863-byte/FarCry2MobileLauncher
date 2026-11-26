@@ -270,7 +270,7 @@ split_new = """public static String[] splitCommand(String command) {
                 inQuotes = !inQuotes;
                 continue;
             }
-            if (!inQuotes && current == '\\' && i + 1 < command.length() && command.charAt(i + 1) == ' ') {
+            if (!inQuotes && current == (char) 92 && i + 1 < command.length() && command.charAt(i + 1) == ' ') {
                 value.append(' ');
                 i++;
                 continue;
