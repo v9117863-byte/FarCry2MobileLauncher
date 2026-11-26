@@ -23,6 +23,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         fun chooseRuntimeFolder()
         fun importRuntime()
         fun chooseMap()
+        fun showMap()
         fun stopGame(): String
         fun deviceInfo(): String
         fun gameStatus(): String
@@ -172,7 +173,8 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         currentPage = "pause"
         heading("PAUSED", "FIELD OPERATIONS  /  GAME MENU")
         body.addView(button("▶   Продолжить", true) { actions.resumeGame() })
-        body.addView(button("Карта") { actions.chooseMap(); message("Выбор карты открыт") })
+        body.addView(button("Открыть карту") { actions.showMap() })
+        body.addView(button("Загрузить изображение карты") { actions.chooseMap(); message("Выбор изображения открыт") })
         body.addView(button("Игра") { showGameFiles() })
         body.addView(button("Задания") { showDiagnostics() })
         body.addView(button("Статистика") { showDiagnostics() })
