@@ -636,6 +636,28 @@ class MainActivity : Activity() {
                 val rootFsDir = RootFS.find(this@MainActivity).rootDir
                 val dxvkLogDir = File(rootFsDir, "tmp")
                 if (!dxvkLogDir.isDirectory) dxvkLogDir.mkdirs()
+                // Apply the upstream Far Cry 2 DXVK compatibility profile.
+                // DXVK 1.10.3 supports both options: apitraceMode improves FC2
+                // performance on all GPUs; the Nvidia vendor ID avoids the
+                // game's vegetation/render-path issue documented by DXVK PR #3241.
+                val dxvkConfigFile = File(gameExe.parentFile ?: rootFsDir, "dxvk.conf")
+                val dxvkConfigLines = if (dxvkConfigFile.isFile)
+                    dxvkConfigFile.readLines(Charsets.UTF_8).toMutableList()
+                else mutableListOf<String>()
+                val fc2DxvkOptions = linkedMapOf(
+                    "d3d9.customVendorId" to "10de",
+                    "d3d9.apitraceMode" to "True"
+                )
+                for ((key, value) in fc2DxvkOptions) {
+                    val lineIndex = dxvkConfigLines.indexOfFirst {
+                        it.substringBefore("=").trim().equals(key, ignoreCase = true)
+                    }
+                    val setting = "$" + "{key} = $" + "{value}"
+                    if (lineIndex >= 0) dxvkConfigLines[lineIndex] = setting
+                    else dxvkConfigLines.add(setting)
+                }
+                dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
+                gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 gameEnv.put("DXVK_LOG_LEVEL", "info")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "+process,+loaddll,+seh")
