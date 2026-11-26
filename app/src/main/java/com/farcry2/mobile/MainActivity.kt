@@ -583,6 +583,13 @@ class MainActivity : Activity() {
                 // is not provided), as confirmed by the device log.
                 container.setDXWrapper(com.winlator.container.DXWrappers.DXVK)
                 container.setDXWrapperConfig("")
+                // Winlator defaults new containers to ESSENTIAL startup, which disables
+                // RpcSs (Start=4). Wine's COM/RPC initialization then fails with
+                // RPC_S_SERVER_UNAVAILABLE and winhandler exits before launching the game.
+                // Far Cry 2 needs the normal service set; XServerDisplayActivity will
+                // apply the changed selection to system.reg before starting Wine.
+                container.setStartupSelection(com.winlator.container.Container.STARTUP_SELECTION_NORMAL)
+                appendLaunchLog("WINE_SERVICES startupSelection=NORMAL RpcSs=automatic")
                 // F: was normalized above; do not append another mapping here.
                 val gameEnv = com.winlator.core.EnvVars(container.getEnvVars())
                 gameEnv.put("WINEESYNC", "0")
