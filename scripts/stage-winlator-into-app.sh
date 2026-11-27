@@ -1731,9 +1731,11 @@ if 'sink_name=AAudioSink' in s:
 old = '''        File modulesDir = new File(workingDir, "modules");
         EnvVars envVars = new EnvVars();'''
 new = '''        File modulesDir = new File(workingDir, "modules");
+        File aaudioModule = new File(modulesDir, "module-aaudio-sink.so");
         ProcessHelper.appendDiagnosticLine("PULSEAUDIO_CONFIG cwd=" + workingDir.getAbsolutePath() +
             " config=" + configFile.getAbsolutePath() + " configExists=" + configFile.isFile() +
             " modules=" + modulesDir.getAbsolutePath() + " modulesExists=" + modulesDir.isDirectory() +
+            " aaudioModule=" + aaudioModule.getAbsolutePath() + " aaudioModuleExists=" + aaudioModule.isFile() +
             " socket=" + socketConfig.path);
         EnvVars envVars = new EnvVars();'''
 if "PULSEAUDIO_CONFIG cwd=" not in s:
@@ -1743,6 +1745,9 @@ old = '''        command += " --exit-idle-time=-1";
 
         return ProcessHelper.exec(command, envVars, workingDir);'''
 new = '''        command += " --exit-idle-time=-1";
+        // The AAudio sink is shipped as an external PulseAudio module in files/pulseaudio/modules.
+        // Explicit dl-search-path avoids relying on a build-time PA_MODULE_DIR from upstream.
+        command += " --dl-search-path=" + modulesDir.getAbsolutePath();
         File logFile = new File(workingDir, "pulseaudio.log");
         command += " --log-level=info --log-target=file:" + logFile.getAbsolutePath();
 
@@ -1753,117 +1758,6 @@ new = '''        command += " --exit-idle-time=-1";
         return processId;'''
 if "PULSEAUDIO_PROCESS pid=" not in s:
     if old not in s: raise SystemExit("PulseAudio process command marker not found")
-    s = s.replace(old, new, 1)
-p.write_text(s)
-PY
-
-# Make movement/look zones invisible without disabling their hit targets or bindings.
-python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
-from pathlib import Path
-import sys
-p = Path(sys.argv[1])
-s = p.read_text()
-old = '''            if (fc2Profile != null) {
-                fc2Profile.setHideMouseCursor(false);
-                fc2Profile.save();
-                showInputControls(fc2Profile);'''
-new = '''            if (fc2Profile != null) {
-                fc2Profile.setHideMouseCursor(true);
-                showInputControls(fc2Profile);
-                inputControlsView.post(() -> {
-                    // Wait for measured dimensions before translating normalized coordinates.
-                    fc2Profile.loadElements(inputControlsView);
-                    float controlWidth = inputControlsView.getMaxWidth();
-                    float controlHeight = inputControlsView.getMaxHeight();
-                    for (com.winlator.inputcontrols.ControlElement element : fc2Profile.getElements()) {
-                        if (element.getType() == com.winlator.inputcontrols.ControlElement.Type.D_PAD) {
-                            // Visible left movement stick, comfortably inside the lower-left corner.
-                            element.setX((int)(controlWidth * 0.145f));
-                            element.setY((int)(controlHeight * 0.755f));
-                            element.setScale(1.12f);
-                            element.setOpacity(0.58f);
-                            continue;
-                        }
-                        if (element.getType() == com.winlator.inputcontrols.ControlElement.Type.TRACKPAD) {
-                            // Keep the right-side look surface fully touch-active but visually hidden.
-                            element.setOpacity(0.0f);
-                            continue;
-                        }
-                        if (element.getType() != com.winlator.inputcontrols.ControlElement.Type.BUTTON) continue;
-                        String binding = element.getBindingAt(0).name();
-                        // Keep the combat cluster on the right, away from the movement stick.
-                        switch (binding) {
-                            case "MOUSE_LEFT_BUTTON":
-                                element.setX((int)(controlWidth * 0.835f));
-                                element.setY((int)(controlHeight * 0.755f));
-                                element.setScale(1.12f);
-                                element.setText("FIRE");
-                                break;
-                            case "MOUSE_RIGHT_BUTTON":
-                                element.setX((int)(controlWidth * 0.715f));
-                                element.setY((int)(controlHeight * 0.605f));
-                                element.setScale(0.92f);
-                                element.setText("AIM");
-                                break;
-                            case "KEY_R":
-                                element.setX((int)(controlWidth * 0.925f));
-                                element.setY((int)(controlHeight * 0.605f));
-                                element.setScale(0.88f);
-                                element.setText("RELOAD");
-                                break;
-                            case "KEY_SPACE":
-                                element.setX((int)(controlWidth * 0.925f));
-                                element.setY((int)(controlHeight * 0.855f));
-                                element.setScale(0.92f);
-                                element.setText("JUMP");
-                                break;
-                            case "KEY_E":
-                                element.setX((int)(controlWidth * 0.715f));
-                                element.setY((int)(controlHeight * 0.875f));
-                                element.setScale(0.88f);
-                                element.setText("USE");
-                                break;
-                            case "KEY_SHIFT_L":
-                                element.setX((int)(controlWidth * 0.835f));
-                                element.setY((int)(controlHeight * 0.925f));
-                                element.setScale(0.78f);
-                                element.setText("RUN");
-                                break;
-                            case "KEY_CTRL_L":
-                                element.setX((int)(controlWidth * 0.605f));
-                                element.setY((int)(controlHeight * 0.875f));
-                                element.setScale(0.78f);
-                                element.setText("CROUCH");
-                                break;
-                            case "KEY_TAB":
-                                element.setX((int)(controlWidth * 0.285f));
-                                element.setY((int)(controlHeight * 0.925f));
-                                element.setScale(0.76f);
-                                element.setText("MAP");
-                                break;
-                            case "KEY_ENTER":
-                                element.setX((int)(controlWidth * 0.465f));
-                                element.setY((int)(controlHeight * 0.925f));
-                                element.setScale(0.72f);
-                                element.setText("OK");
-                                break;
-                            case "KEY_ESC":
-                                element.setX((int)(controlWidth * 0.555f));
-                                element.setY((int)(controlHeight * 0.925f));
-                                element.setScale(0.72f);
-                                element.setText("MENU");
-                                break;
-                        }
-                    }
-                    fc2Profile.save();
-                    inputControlsView.invalidate();
-                    com.winlator.core.ProcessHelper.appendDiagnosticLine(
-                        "FC2_TOUCH_CONTROLS profile=4 name=" + fc2Profile.getName() +
-                        " elements=" + fc2Profile.getElements().size() +
-                        " movementStickVisible=true lookSurfaceInvisible=true layout=compact-right");
-                });'''
-if "element.setOpacity(0.0f)" not in s:
-    if old not in s: raise SystemExit("FC2 touch profile activation block not found")
     s = s.replace(old, new, 1)
 p.write_text(s)
 PY
