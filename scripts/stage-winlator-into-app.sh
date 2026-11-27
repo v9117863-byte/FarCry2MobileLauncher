@@ -1937,6 +1937,6 @@ for line in lines:
             continue
         seen = True
     out.append(line)
-s = "\\n".join(out) + "\\n"
+s = "\n".join(out) + "\n"
 p.write_text(s)
 PY
