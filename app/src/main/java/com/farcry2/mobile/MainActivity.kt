@@ -775,7 +775,7 @@ class MainActivity : Activity() {
                         "HdrFP32" to "0",
                         "Bloom" to "0",
                         "AllowAsynchShaderLoading" to "1",
-                        "MaxDriverBufferedFrames" to "2"
+                        "MaxDriverBufferedFrames" to "1"
                     )
                     for ((key, value) in forcedAttrs) {
                         val attr = Regex("\\b" + Regex.escape(key) + "=\"[^\"]*\"")
@@ -955,7 +955,7 @@ class MainActivity : Activity() {
                 val dxvkTuning = linkedMapOf(
                     "d3d9.apitraceMode" to "False",
                     // Two queued frames avoid starving the mobile GPU while keeping latency bounded.
-                    "d3d9.maxFrameLatency" to "2",
+                    "d3d9.maxFrameLatency" to "1",
                     // Let DXVK's 30 FPS limiter pace frames; avoid a second blocking VSync wait.
                     "d3d9.presentInterval" to "0",
                     "dxgi.maxFrameRate" to "30"
@@ -970,7 +970,7 @@ class MainActivity : Activity() {
                 dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
-                    " customVendorId=unset adapterIdentity=native apitraceMode=False vsync=0 frameCap=30 maxFrameLatency=2")
+                    " customVendorId=unset adapterIdentity=native apitraceMode=False vsync=0 frameCap=30 maxFrameLatency=1")
                 gameEnv.put("DXVK_LOG_LEVEL", "warn")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "-all")
