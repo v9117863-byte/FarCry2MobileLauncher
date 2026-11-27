@@ -318,10 +318,10 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             "JUMP" -> 4
             "USE" -> 5
             "CROUCH" -> 7
-            "GRENADE" -> 0
-            "MELEE" -> 0
-            "WEAPON" -> 0
-            else -> 8
+            "SPRINT" -> 6
+            "MAP" -> 9
+            "PAUSE" -> 8
+            else -> 0
         }
         val slot = (elements.length() - 8).coerceAtLeast(0)
         val column = slot % 4
