@@ -197,6 +197,10 @@ end = s.find("\n    private void ", start + 48)
 if start < 0 or end < 0:
     raise SystemExit("changeWineAudioDriver method boundaries not found")
 method = """    private void changeWineAudioDriver() {
+        // The app ships the PulseAudio AAudio sink, not a matching ALSA output path.
+        // Keep the Wine registry and the actually started server on the same backend.
+        audioDriver = AudioDrivers.PULSEAUDIO;
+        container.setAudioDriver(AudioDrivers.PULSEAUDIO);
         File rootDir = rootFS.getRootDir();
         File userRegFile = new File(rootDir, RootFS.WINEPREFIX+"/user.reg");
         try (WineRegistryEditor registryEditor = new WineRegistryEditor(userRegFile)) {
