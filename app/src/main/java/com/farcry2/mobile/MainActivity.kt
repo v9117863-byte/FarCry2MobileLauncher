@@ -77,6 +77,7 @@ class MainActivity : Activity() {
             override fun gameStatus() = bridge.getGameInstallStatus()
             override fun runtimeStatus() = bridge.getRuntimeBundleStatus()
             override fun saveSettings(json: String) = bridge.saveLaunchSettings(json)
+            override fun loadSettings() = bridge.loadLaunchSettings()
             override fun loadControlLayout() = bridge.loadControlLayout()
             override fun saveControlLayout(json: String) = bridge.saveControlLayout(json)
             override fun copyError() = bridge.copyErrorToClipboard("Native launcher diagnostic report")
@@ -752,6 +753,8 @@ class MainActivity : Activity() {
                         "Platform" to "d3d9",
                         "Fullscreen" to "1",
                         "Maximized" to "1",
+                        "ForceWidescreen" to "1",
+                        "AspectRatio" to "0",
                         "ResolutionX" to profileWidth.toString(),
                         "ResolutionY" to profileHeight.toString(),
                         "VSync" to "0",
@@ -890,6 +893,8 @@ class MainActivity : Activity() {
                 "480p" -> "854x480"
                 "600p" -> "1066x600"
                 "720p" -> "1280x720"
+                "900p" -> "1600x900"
+                "1080p" -> "1920x1080"
                 "Native" -> {
                     val metrics = android.util.DisplayMetrics()
                     @Suppress("DEPRECATION")
@@ -994,8 +999,23 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface fun saveLaunchSettings(json: String) {
-            prefs.edit().putString("launch_settings", json).apply()
+            val parsed = JSONObject(json)
+            require(parsed.optString("resolution") in setOf("480p", "540p", "600p", "720p", "900p", "1080p", "Native"))
+            require(parsed.optString("graphicsDriver") in setOf("Системный", "Turnip", "VirGL"))
+            require(parsed.optString("performance") in setOf("Низкая", "Средняя", "Высокая"))
+            check(prefs.edit().putString("launch_settings", parsed.toString()).commit()) {
+                "Не удалось записать настройки"
+            }
+            appendLaunchLog("LAUNCH_SETTINGS_SAVED " + parsed)
         }
+
+        @JavascriptInterface fun loadLaunchSettings(): String =
+            prefs.getString("launch_settings", null) ?: JSONObject()
+                .put("resolution", "Native")
+                .put("graphicsDriver", "Системный")
+                .put("performance", "Низкая")
+                .put("touchControls", true)
+                .toString()
 
         @JavascriptInterface fun onGameInput(json: String) {
             worker.execute {
