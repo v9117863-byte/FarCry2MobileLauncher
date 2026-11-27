@@ -1630,7 +1630,7 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 if "import android.graphics.LinearGradient;" not in s:
-    s = s.replace("import android.graphics.Color;\\n",
-        "import android.graphics.Color;\\nimport android.graphics.LinearGradient;\\nimport android.graphics.Shader;\\n", 1)
+    s = s.replace("import android.graphics.Color;\n",
+        "import android.graphics.Color;\nimport android.graphics.LinearGradient;\nimport android.graphics.Shader;\n", 1)
 p.write_text(s)
 PY
