@@ -952,12 +952,20 @@ class MainActivity : Activity() {
                 prefs.getString("launch_settings", null)?.let { JSONObject(it) }
             } catch (_: Exception) { null }
             return when (settings?.optString("resolution", "Native") ?: "Native") {
+                "360p" -> "640x360"
+                "400p" -> "711x400"
+                "432p" -> "768x432"
                 "480p" -> "854x480"
                 "540p" -> "960x540"
                 "600p" -> "1066x600"
+                "640p" -> "1138x640"
                 "720p" -> "1280x720"
+                "800p" -> "1422x800"
                 "900p" -> "1600x900"
+                "960p" -> "1706x960"
                 "1080p" -> "1920x1080"
+                "1200p" -> "2133x1200"
+                "1440p" -> "2560x1440"
                 "Native" -> {
                     val metrics = android.util.DisplayMetrics()
                     @Suppress("DEPRECATION")
@@ -1112,7 +1120,7 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun saveLaunchSettings(json: String) {
             val parsed = JSONObject(json)
-            require(parsed.optString("resolution") in setOf("480p", "540p", "600p", "720p", "900p", "1080p", "Native"))
+            require(parsed.optString("resolution") in setOf("360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "Native"))
             require(parsed.optString("graphicsDriver") in setOf("Системный", "Turnip", "VirGL"))
             require(parsed.optString("performance") in setOf("Низкая", "Средняя", "Высокая"))
             check(prefs.edit().putString("launch_settings", parsed.toString()).commit()) {
