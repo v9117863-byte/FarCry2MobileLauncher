@@ -229,7 +229,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         val driver = spinner(listOf("Системный", "Turnip", "VirGL"),
             saved.optString("graphicsDriver", "Системный"))
         body.addView(text("Графический драйвер", 12f, Color.WHITE)); body.addView(driver)
-        val quality = spinner(listOf("Низкая", "Средняя", "Высокая"),
+        val quality = spinner(listOf("Минимальная", "Низкая", "Средняя", "Высокая"),
             saved.optString("performance", "Низкая"))
         body.addView(text("Профиль производительности", 12f, Color.WHITE)); body.addView(quality)
         body.addView(text("Низкие профили экономят память и уменьшают нагрузку на GPU", 10f, olive))
