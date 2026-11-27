@@ -717,8 +717,8 @@ class MainActivity : Activity() {
                 container.setScreenSize(resolveRequestedScreenSize())
                 container.setAudioDriver(com.winlator.container.AudioDrivers.PULSEAUDIO)
                 // Keep a real AAudio sink, full volume and a stable low-latency PulseAudio buffer.
-                container.setAudioDriverConfig("performanceMode=1,volume=1.0,latencyMillis=32")
-                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio config=performanceMode:1,volume:1.0,latencyMillis:32; Wine registry and XEnvironment socket are forced")
+                container.setAudioDriverConfig("performanceMode=1,volume=1.0,latencyMillis=64")
+                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio config=performanceMode:1,volume:1.0,latencyMillis:64; Wine registry and XEnvironment socket are forced")
                 // Far Cry 2 reads its renderer from GamerProfile.xml; seed DX9 before its first run.
                 val fc2ProfileDir = File(container.getUserDir(), "Documents/My Games/Far Cry 2")
                 if (!fc2ProfileDir.isDirectory && !fc2ProfileDir.mkdirs()) {
@@ -904,7 +904,7 @@ class MainActivity : Activity() {
                 }
                 val dxvkTuning = linkedMapOf(
                     "d3d9.apitraceMode" to "False",
-                    "d3d9.maxFrameLatency" to "2",
+                    "d3d9.maxFrameLatency" to "1",
                     "d3d9.presentInterval" to "1",
                     "dxgi.maxFrameRate" to "30"
                 )
@@ -918,7 +918,7 @@ class MainActivity : Activity() {
                 dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
-                    " customVendorId=unset adapterIdentity=native apitraceMode=False vsync=1 frameCap=30 maxFrameLatency=2")
+                    " customVendorId=unset adapterIdentity=native apitraceMode=False vsync=1 frameCap=30 maxFrameLatency=1")
                 gameEnv.put("DXVK_LOG_LEVEL", "warn")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "-all")
@@ -1033,61 +1033,76 @@ class MainActivity : Activity() {
                 }
                 val elements = data.optJSONArray("elements")
                 if (elements != null) {
-                    val iconIds = mapOf("FIRE" to 1, "AIM" to 2, "RELOAD" to 3, "JUMP" to 4,
-                        "USE" to 5, "RUN" to 6, "CROUCH" to 7, "MENU" to 8, "MAP" to 9)
-                    val labels = linkedSetOf<String>()
+                    val labelsByBinding = linkedMapOf(
+                        "MOUSE_LEFT_BUTTON" to "FIRE",
+                        "MOUSE_RIGHT_BUTTON" to "AIM",
+                        "KEY_R" to "RELOAD",
+                        "KEY_E" to "USE",
+                        "KEY_SPACE" to "JUMP",
+                        "KEY_SHIFT_L" to "SPRINT",
+                        "KEY_C" to "CROUCH / SEAT",
+                        "KEY_Q" to "THROW",
+                        "KEY_F" to "SWITCH THROW",
+                        "KEY_H" to "HEAL",
+                        "KEY_1" to "MACHETE",
+                        "KEY_2" to "SECONDARY",
+                        "KEY_3" to "PRIMARY",
+                        "KEY_4" to "SPECIAL",
+                        "KEY_5" to "MAP / PHONE",
+                        "MOUSE_SCROLL_UP" to "NEXT WEAPON",
+                        "MOUSE_SCROLL_DOWN" to "PREV WEAPON",
+                        "KEY_ESC" to "PAUSE",
+                        "KEY_F5" to "QUICK SAVE",
+                        "KEY_F9" to "QUICK LOAD"
+                    )
+                    val obsoleteDefaultBindings = setOf("KEY_G", "KEY_V", "KEY_B", "KEY_M",
+                        "KEY_X", "KEY_CTRL_L", "KEY_TAB", "KEY_ENTER")
+                    val seenBindings = linkedSetOf<String>()
+                    var i = elements.length() - 1
+                    while (i >= 0) {
+                        val item = elements.optJSONObject(i)
+                        if (item != null && item.optString("type") == "BUTTON") {
+                            val binding = item.optJSONArray("bindings")?.optString(0, "NONE") ?: "NONE"
+                            if (binding in obsoleteDefaultBindings) {
+                                elements.remove(i)
+                                changed = true
+                            } else if (labelsByBinding.containsKey(binding)) {
+                                val label = labelsByBinding[binding]!!
+                                if (!seenBindings.add(binding)) {
+                                    elements.remove(i)
+                                    changed = true
+                                } else if (item.optString("text") != label) {
+                                    item.put("text", label)
+                                    changed = true
+                                }
+                            }
+                        }
+                        i--
+                    }
+                    val xs = listOf(0.69, 0.80, 0.91)
+                    val ys = listOf(0.29, 0.395, 0.50, 0.605, 0.71, 0.815, 0.92)
+                    var index = 0
+                    for ((binding, label) in labelsByBinding) {
+                        if (seenBindings.add(binding)) {
+                            val scale = if (binding == "MOUSE_LEFT_BUTTON" || binding == "MOUSE_RIGHT_BUTTON") 0.82 else 0.62
+                            elements.put(JSONObject().put("type", "BUTTON").put("shape", "CIRCLE")
+                                .put("bindings", org.json.JSONArray().put(binding))
+                                .put("scale", scale).put("x", xs[index % 3]).put("y", ys[index / 3])
+                                .put("toggleSwitch", false).put("text", label).put("iconId", 0))
+                            changed = true
+                        }
+                        index++
+                    }
                     for (i in 0 until elements.length()) {
                         val item = elements.optJSONObject(i) ?: continue
                         val binding = item.optJSONArray("bindings")?.optString(0, "NONE") ?: "NONE"
-                        var label = item.optString("text", "").uppercase()
-                        if (label.isBlank()) {
-                            label = when (item.optString("type")) {
-                                "D_PAD" -> "MOVE"
-                                "RADIAL_MENU" -> if (binding == "KEY_F") "ACTIONS" else "TOOLS"
-                                "RANGE_BUTTON" -> if (item.optString("range").contains("F1")) "FUNCTIONS" else "NUMBERS"
-                                else -> when (binding) {
-                                    "MOUSE_LEFT_BUTTON" -> "FIRE"
-                                    "MOUSE_RIGHT_BUTTON" -> "AIM"
-                                    "KEY_R" -> "RELOAD"
-                                    "KEY_SPACE" -> "JUMP"
-                                    "KEY_E" -> "USE"
-                                    "KEY_ENTER" -> "ENTER"
-                                    "KEY_ESC" -> "PAUSE"
-                                    "KEY_SHIFT_L" -> "SPRINT"
-                                    "KEY_CTRL_L" -> "CROUCH"
-                                    "KEY_TAB" -> "INVENTORY"
-                                    "KEY_ALT_L" -> "ALT"
-                                    else -> "BUTTON"
-                                }
-                            }
+                        val label = when (item.optString("type")) {
+                            "D_PAD" -> "MOVE"
+                            "TRACKPAD" -> "LOOK"
+                            else -> labelsByBinding[binding] ?: item.optString("text", "BUTTON")
+                        }
+                        if (item.optString("text") != label) {
                             item.put("text", label)
-                            changed = true
-                        }
-                        labels.add(label)
-                        val iconId = iconIds[label] ?: 0
-                        if (iconId > 0 && item.optInt("iconId", 0) == 0) {
-                            item.put("iconId", iconId)
-                            changed = true
-                        }
-                    }
-                    // Add dedicated, labeled actions without replacing or moving existing controls.
-                    val extras = listOf(
-                        arrayOf("GRENADE", "KEY_G", "0.68", "0.28"),
-                        arrayOf("MELEE", "KEY_V", "0.79", "0.28"),
-                        arrayOf("BINOCULARS", "KEY_B", "0.90", "0.28"),
-                        arrayOf("HEAL", "KEY_H", "0.68", "0.43"),
-                        arrayOf("MAP", "KEY_M", "0.79", "0.43"),
-                        arrayOf("WEAPON 2", "KEY_2", "0.90", "0.43"),
-                        arrayOf("WEAPON 3", "KEY_3", "0.68", "0.58"),
-                        arrayOf("WEAPON 4", "KEY_4", "0.79", "0.58"),
-                        arrayOf("FIRE MODE", "KEY_X", "0.90", "0.58")
-                    )
-                    for (entry in extras) {
-                        if (labels.add(entry[0])) {
-                            elements.put(JSONObject().put("type", "BUTTON").put("shape", "CIRCLE")
-                                .put("bindings", org.json.JSONArray().put(entry[1]))
-                                .put("scale", 0.76).put("x", entry[2].toDouble()).put("y", entry[3].toDouble())
-                                .put("toggleSwitch", false).put("text", entry[0]).put("iconId", 0))
                             changed = true
                         }
                     }
