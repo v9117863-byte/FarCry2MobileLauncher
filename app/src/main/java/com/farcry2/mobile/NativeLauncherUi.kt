@@ -584,7 +584,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         }
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         return Spinner(activity).apply {
-            adapter = adapter
+            this.adapter = adapter
             setSelection(values.indexOf(selected).coerceAtLeast(0))
             minimumHeight = dp(46)
             backgroundTintList = ColorStateList.valueOf(gold)
