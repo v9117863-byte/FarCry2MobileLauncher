@@ -222,7 +222,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         section("Экран")
         val saved = try { JSONObject(actions.loadSettings()) } catch (_: Exception) { JSONObject() }
         val resolution = spinner(listOf("144p", "240p", "320p", "360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "1600p", "1800p", "2160p", "Native"),
-            saved.optString("resolution", "Native"))
+            saved.optString("resolution", "540p"))
         body.addView(text("Разрешение игрового экрана", 12f, Color.WHITE)); body.addView(resolution)
         body.addView(text("Изображение: растянуть на весь экран, без чёрных полос", 11f, olive))
         section("Графика")
@@ -269,18 +269,30 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             topMargin = dp(8)
             bottomMargin = dp(8)
         })
-        val sizeChoice = spinner(listOf("50%", "75%", "100%", "125%", "150%", "175%"), "100%")
-        body.addView(text("Размер выбранной кнопки", 12f, Color.WHITE))
-        body.addView(sizeChoice)
+        val sizeLabel = text("РАЗМЕР КНОПКИ: 100%", 12f, Color.WHITE, true)
+        body.addView(sizeLabel)
+        val sizeSlider = SeekBar(activity).apply {
+            max = 150
+            progress = 50
+            contentDescription = "Размер выбранной кнопки от 50 до 200 процентов"
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    sizeLabel.text = "РАЗМЕР КНОПКИ: ${progress + 50}%"
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            })
+        }
+        body.addView(sizeSlider, LinearLayout.LayoutParams(-1, dp(42)))
         body.addView(button("ПРИМЕНИТЬ РАЗМЕР") {
             val selected = preview.selectedIndex
-            if (selected >= 0 && selected < elements.length()) {
+            if (selected in 0 until elements.length()) {
                 val item = elements.optJSONObject(selected)
-                val multiplier = (sizeChoice.selectedItem?.toString()?.removeSuffix("%")?.toFloatOrNull() ?: 100f) / 100f
-                item?.put("scale", (multiplier * 0.9f).coerceIn(0.35f, 1.8f))
+                val scale = ((sizeSlider.progress + 50) / 100f * 0.9f).coerceIn(0.35f, 1.8f)
+                item?.put("scale", scale)
                 actions.saveControlLayout(elements.toString())
                 preview.invalidate()
-                message("Размер кнопки обновлён")
+                message("Размер кнопки сохранён: ${sizeSlider.progress + 50}%")
             } else message("Сначала выбери кнопку на поле")
         })
         body.addView(button("РАЗВЕРНУТЬ РЕДАКТОР НА ВЕСЬ ЭКРАН", true) {
@@ -382,20 +394,31 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         sizePanel.addView(text("РАЗМЕР", 11f, cream, true).apply {
             gravity = Gravity.CENTER_VERTICAL
         }, LinearLayout.LayoutParams(dp(76), dp(46)))
-        val fullscreenSize = spinner(listOf("50%", "75%", "100%", "125%", "150%", "175%", "200%"),
-            "100%")
+        val fullscreenSizeLabel = text("100%", 12f, cream, true).apply { gravity = Gravity.CENTER }
+        val fullscreenSize = SeekBar(activity).apply {
+            max = 150
+            progress = 50
+            contentDescription = "Размер выбранной кнопки от 50 до 200 процентов"
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    fullscreenSizeLabel.text = "${progress + 50}%"
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            })
+        }
+        sizePanel.addView(fullscreenSizeLabel, LinearLayout.LayoutParams(dp(54), dp(46)))
         sizePanel.addView(fullscreenSize, LinearLayout.LayoutParams(0, dp(46), 1f))
         sizePanel.addView(button("ПРИМЕНИТЬ") {
             val selected = largePreview.selectedIndex
             if (selected in 0 until elements.length()) {
                 val item = elements.optJSONObject(selected)
-                val multiplier = (fullscreenSize.selectedItem?.toString()
-                    ?.removeSuffix("%")?.toFloatOrNull() ?: 100f) / 100f
-                item?.put("scale", (multiplier * 0.9f).coerceIn(0.35f, 2.0f))
+                val scale = ((fullscreenSize.progress + 50) / 100f * 0.9f).coerceIn(0.35f, 2.0f)
+                item?.put("scale", scale)
                 actions.saveControlLayout(elements.toString())
                 largePreview.invalidate()
                 mainPreview.invalidate()
-                message("Размер кнопки сохранён")
+                message("Размер кнопки сохранён: ${fullscreenSize.progress + 50}%")
             } else message("Сначала коснись нужной кнопки на поле")
         }.apply { layoutParams = LinearLayout.LayoutParams(dp(116), dp(46)) })
         layout.addView(sizePanel)
