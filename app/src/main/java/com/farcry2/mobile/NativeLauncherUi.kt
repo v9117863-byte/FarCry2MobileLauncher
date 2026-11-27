@@ -259,7 +259,9 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             showFullscreenControlEditor(elements, preview)
         })
         val addRow = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        val choices = listOf("FIRE", "AIM", "RELOAD", "JUMP", "USE", "CROUCH", "MAP", "GRENADE", "MELEE", "WEAPON")
+        val choices = listOf("FIRE", "AIM", "RELOAD", "JUMP", "USE", "CROUCH", "MAP",
+            "GRENADE", "MELEE", "WEAPON", "SPRINT", "BINOCULARS", "HEAL",
+            "WEAPON 2", "WEAPON 3", "WEAPON 4", "FIRE MODE", "INVENTORY", "PAUSE")
         val choice = spinner(choices, "RELOAD")
         addRow.addView(choice, LinearLayout.LayoutParams(0, dp(44), 1f))
         addRow.addView(button("＋ ДОБАВИТЬ") {
@@ -298,6 +300,15 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
             "GRENADE" -> arrayOf("KEY_G", "NONE", "NONE", "NONE")
             "MELEE" -> arrayOf("KEY_V", "NONE", "NONE", "NONE")
             "WEAPON" -> arrayOf("KEY_1", "NONE", "NONE", "NONE")
+            "SPRINT" -> arrayOf("KEY_SHIFT_L", "NONE", "NONE", "NONE")
+            "BINOCULARS" -> arrayOf("KEY_B", "NONE", "NONE", "NONE")
+            "HEAL" -> arrayOf("KEY_H", "NONE", "NONE", "NONE")
+            "WEAPON 2" -> arrayOf("KEY_2", "NONE", "NONE", "NONE")
+            "WEAPON 3" -> arrayOf("KEY_3", "NONE", "NONE", "NONE")
+            "WEAPON 4" -> arrayOf("KEY_4", "NONE", "NONE", "NONE")
+            "FIRE MODE" -> arrayOf("KEY_X", "NONE", "NONE", "NONE")
+            "INVENTORY" -> arrayOf("KEY_I", "NONE", "NONE", "NONE")
+            "PAUSE" -> arrayOf("KEY_ESC", "NONE", "NONE", "NONE")
             else -> arrayOf("KEY_M", "NONE", "NONE", "NONE")
         }
         val iconId = when (action) {
@@ -398,7 +409,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
                 val x = (item.optDouble("x",0.5)*w).toFloat()
                 val y = (item.optDouble("y",0.5)*h).toFloat()
                 val scale = item.optDouble("scale",0.9).toFloat()
-                val radius = (if (item.optString("type") == "D_PAD" || item.optString("type") == "TRACKPAD") 35f else 23f) * density * scale
+                val radius = (if (item.optString("type") == "D_PAD" || item.optString("type") == "TRACKPAD") 35f else 27f) * density * scale
                 val label = item.optString("text","BTN")
                 val color = when (label.uppercase()) {
                     "FIRE" -> Color.rgb(153,75,48)
@@ -437,12 +448,23 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
                     "MAP" -> "⌖"
                     "MOVE" -> "✣"
                     "LOOK" -> "◉"
+                    "GRENADE" -> "✹"
+                    "MELEE" -> "⚔"
+                    "BINOCULARS" -> "◎"
+                    "HEAL" -> "+"
+                    "WEAPON 2" -> "②"
+                    "WEAPON 3" -> "③"
+                    "WEAPON 4" -> "④"
+                    "FIRE MODE" -> "⇄"
+                    "SPRINT" -> "»"
                     else -> "•"
                 }
                 paint.textSize = radius * 0.72f
                 canvas.drawText(glyph, x, y - radius * 0.08f, paint)
-                paint.textSize = (if (radius > 30f*density) 8f else 7f)*density
-                canvas.drawText(label.take(8),x,y+radius*0.52f,paint)
+                paint.textSize = minOf(8f*density, (radius*1.55f)/(label.length.coerceAtLeast(1)*0.58f)).coerceAtLeast(5f*density)
+                paint.isFakeBoldText = true
+                canvas.drawText(label,x,y+radius*0.70f,paint)
+                paint.isFakeBoldText = false
             }
         }
 
