@@ -1683,6 +1683,83 @@ if "VULKAN_ICD_READY manifest=" not in s:
     s = s.replace(old, new, 1)
 p.write_text(s)
 PY
+
+# Put a compact control-layout editor directly over the live game controls.
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+if "FC2_IN_GAME_CONTROL_EDITOR" not in s:
+    if "import android.widget.Button;" not in s:
+        s = s.replace("import android.widget.ArrayAdapter;", "import android.widget.ArrayAdapter;\nimport android.widget.Button;", 1)
+    marker = """        rootView.addView(inputControlsView);
+
+        if (container != null"""
+    insert = """        rootView.addView(inputControlsView);
+
+        // FC2_IN_GAME_CONTROL_EDITOR: edit the actual overlay without leaving the game.
+        Button editControlsButton = new Button(this);
+        editControlsButton.setText("✎");
+        editControlsButton.setTextSize(20);
+        editControlsButton.setAllCaps(false);
+        editControlsButton.setAlpha(0.82f);
+        FrameLayout.LayoutParams editButtonParams = new FrameLayout.LayoutParams(
+            (int)(52 * getResources().getDisplayMetrics().density),
+            (int)(48 * getResources().getDisplayMetrics().density));
+        editButtonParams.gravity = android.view.Gravity.TOP | android.view.Gravity.RIGHT;
+        editButtonParams.topMargin = (int)(12 * getResources().getDisplayMetrics().density);
+        editButtonParams.rightMargin = (int)(12 * getResources().getDisplayMetrics().density);
+        rootView.addView(editControlsButton, editButtonParams);
+
+        Button addControlButton = new Button(this);
+        addControlButton.setText("+");
+        addControlButton.setTextSize(20);
+        addControlButton.setVisibility(View.GONE);
+        FrameLayout.LayoutParams addButtonParams = new FrameLayout.LayoutParams(
+            (int)(52 * getResources().getDisplayMetrics().density),
+            (int)(48 * getResources().getDisplayMetrics().density));
+        addButtonParams.gravity = android.view.Gravity.TOP | android.view.Gravity.RIGHT;
+        addButtonParams.topMargin = (int)(66 * getResources().getDisplayMetrics().density);
+        addButtonParams.rightMargin = (int)(12 * getResources().getDisplayMetrics().density);
+        rootView.addView(addControlButton, addButtonParams);
+
+        Button removeControlButton = new Button(this);
+        removeControlButton.setText("−");
+        removeControlButton.setTextSize(20);
+        removeControlButton.setVisibility(View.GONE);
+        FrameLayout.LayoutParams removeButtonParams = new FrameLayout.LayoutParams(
+            (int)(52 * getResources().getDisplayMetrics().density),
+            (int)(48 * getResources().getDisplayMetrics().density));
+        removeButtonParams.gravity = android.view.Gravity.TOP | android.view.Gravity.RIGHT;
+        removeButtonParams.topMargin = (int)(120 * getResources().getDisplayMetrics().density);
+        removeButtonParams.rightMargin = (int)(12 * getResources().getDisplayMetrics().density);
+        rootView.addView(removeControlButton, removeButtonParams);
+
+        editControlsButton.setOnClickListener(v -> {
+            boolean editing = !inputControlsView.isEditMode();
+            inputControlsView.setEditMode(editing);
+            editControlsButton.setText(editing ? "✓" : "✎");
+            addControlButton.setVisibility(editing ? View.VISIBLE : View.GONE);
+            removeControlButton.setVisibility(editing ? View.VISIBLE : View.GONE);
+            if (!editing && inputControlsView.getProfile() != null) inputControlsView.getProfile().save();
+            inputControlsView.invalidate();
+        });
+        addControlButton.setOnClickListener(v -> {
+            inputControlsView.addElement();
+            inputControlsView.invalidate();
+        });
+        removeControlButton.setOnClickListener(v -> {
+            inputControlsView.removeElement();
+            inputControlsView.invalidate();
+        });
+
+        if (container != null"""
+    if marker not in s: raise SystemExit("In-game editor insertion point not found")
+    s = s.replace(marker, insert, 1)
+p.write_text(s)
+PY
+
 echo "Java: $(find "$APP/java/com/winlator" -type f -name '*.java' | wc -l)"
 echo "C/C++: $(find "$APP/cpp" -type f | wc -l)"
 echo "JNI: $(find "$APP/jniLibs" -type f 2>/dev/null | wc -l)"
