@@ -1731,7 +1731,7 @@ new = '''            if (fc2Profile != null) {
                             continue;
                         }
                         if (element.getType() != com.winlator.inputcontrols.ControlElement.Type.BUTTON) continue;
-                        String binding = element.getBindingAt(0).toString();
+                        String binding = element.getBindingAt(0).name();
                         // Keep the combat cluster on the right, away from the movement stick.
                         switch (binding) {
                             case "MOUSE_LEFT_BUTTON":
