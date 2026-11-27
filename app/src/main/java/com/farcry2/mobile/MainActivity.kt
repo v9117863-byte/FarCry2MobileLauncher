@@ -716,7 +716,9 @@ class MainActivity : Activity() {
                 container.setDrives(driveMap.toString())
                 container.setScreenSize(resolveRequestedScreenSize())
                 container.setAudioDriver(com.winlator.container.AudioDrivers.PULSEAUDIO)
-                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio; Wine registry will use pulse; PulseAudio socket is provided by Winlator XEnvironment")
+                // Keep a real AAudio sink, full volume and a stable low-latency PulseAudio buffer.
+                container.setAudioDriverConfig("performanceMode=1,volume=1.0,latencyMillis=16")
+                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio config=performanceMode:1,volume:1.0,latencyMillis:16; Wine registry and XEnvironment socket are forced")
                 // Far Cry 2 reads its renderer from GamerProfile.xml; seed DX9 before its first run.
                 val fc2ProfileDir = File(container.getUserDir(), "Documents/My Games/Far Cry 2")
                 if (!fc2ProfileDir.isDirectory && !fc2ProfileDir.mkdirs()) {
@@ -763,8 +765,8 @@ class MainActivity : Activity() {
                         "Hdr" to "0",
                         "HdrFP32" to "0",
                         "Bloom" to "0",
-                        "AllowAsynchShaderLoading" to "0",
-                        "MaxDriverBufferedFrames" to "1"
+                        "AllowAsynchShaderLoading" to "1",
+                        "MaxDriverBufferedFrames" to "2"
                     )
                     for ((key, value) in forcedAttrs) {
                         val attr = Regex("\\b" + Regex.escape(key) + "=\"[^\"]*\"")
@@ -777,6 +779,60 @@ class MainActivity : Activity() {
                     val forcedProfile = oldProfile.replaceRange(match.range, renderAttrs)
                     if (forcedProfile != oldProfile) fc2Profile.writeText(forcedProfile)
                 }
+                // Apply the selected performance preset to the actual nested FC2 quality block.
+                var normalizedProfile = fc2Profile.readText()
+                val soundTag = Regex("<SoundProfile\\b[^>]*/>").find(normalizedProfile)
+                if (soundTag != null) {
+                    var attrs = soundTag.value
+                    for ((key, value) in linkedMapOf("MusicEnabled" to "1", "MasterVolume" to "100")) {
+                        val attr = Regex("\\b" + Regex.escape(key) + "=\\"[^\\"]*\\"")
+                        attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "$key=\\"$value\\"")
+                            else attrs.dropLast(2) + " $key=\\"$value\\"/>"
+                    }
+                    normalizedProfile = normalizedProfile.replaceRange(soundTag.range, attrs)
+                }
+                val selectedPerformance = try {
+                    prefs.getString("launch_settings", null)?.let { JSONObject(it).optString("performance", "Низкая") }
+                } catch (_: Exception) { "Низкая" } ?: "Низкая"
+                val qualityValues = when (selectedPerformance) {
+                    "Высокая" -> linkedMapOf(
+                        "EnvironmentQuality" to "high", "AntiPortalQuality" to "high",
+                        "PostFxQuality" to "medium", "TextureQuality" to "high",
+                        "TextureResolutionQuality" to "high", "WaterQuality" to "medium",
+                        "DepthPassQuality" to "high", "VegetationQuality" to "medium",
+                        "TerrainQuality" to "high", "GeometryQuality" to "high",
+                        "AmbientQuality" to "medium", "ShadowQuality" to "low",
+                        "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
+                    "Средняя" -> linkedMapOf(
+                        "EnvironmentQuality" to "medium", "AntiPortalQuality" to "high",
+                        "PostFxQuality" to "low", "TextureQuality" to "medium",
+                        "TextureResolutionQuality" to "medium", "WaterQuality" to "low",
+                        "DepthPassQuality" to "high", "VegetationQuality" to "low",
+                        "TerrainQuality" to "medium", "GeometryQuality" to "medium",
+                        "AmbientQuality" to "low", "ShadowQuality" to "off",
+                        "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
+                    else -> linkedMapOf(
+                        "EnvironmentQuality" to "low", "AntiPortalQuality" to "high",
+                        "PostFxQuality" to "low", "TextureQuality" to "low",
+                        "TextureResolutionQuality" to "low", "WaterQuality" to "low",
+                        "DepthPassQuality" to "high", "VegetationQuality" to "low",
+                        "TerrainQuality" to "low", "GeometryQuality" to "low",
+                        "AmbientQuality" to "low", "ShadowQuality" to "off",
+                        "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
+                }
+                val qualityTag = Regex("<quality\\b[^>]*/>").find(normalizedProfile)
+                if (qualityTag != null) {
+                    var attrs = qualityTag.value
+                    for ((key, value) in qualityValues) {
+                        val attr = Regex("\\b" + Regex.escape(key) + "=\\"[^\\"]*\\"")
+                        attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "$key=\\"$value\\"")
+                            else attrs.dropLast(2) + " $key=\\"$value\\"/>"
+                    }
+                    normalizedProfile = normalizedProfile.replaceRange(qualityTag.range, attrs)
+                }
+                if (normalizedProfile != fc2Profile.readText()) fc2Profile.writeText(normalizedProfile)
+                appendLaunchLog("FC2_PERFORMANCE_PROFILE selected=$selectedPerformance asyncShaders=1 textureQuality=" + qualityValues["TextureQuality"])
+
                 // Mirror the enforced profile to both locations used by FC2/Wine.
                 val alternateProfile = File(container.getUserDir(), "My Games/Far Cry 2/GamerProfile.xml")
                 val alternateDir = alternateProfile.parentFile
@@ -846,12 +902,18 @@ class MainActivity : Activity() {
                 dxvkConfigLines.removeAll {
                     it.substringBefore("=").trim().equals("d3d9.customVendorId", ignoreCase = true)
                 }
-                val apitraceKey = "d3d9.apitraceMode"
-                val apitraceIndex = dxvkConfigLines.indexOfFirst {
-                    it.substringBefore("=").trim().equals(apitraceKey, ignoreCase = true)
+                val dxvkTuning = linkedMapOf(
+                    "d3d9.apitraceMode" to "False",
+                    "d3d9.maxFrameLatency" to "1",
+                    "d3d9.presentInterval" to "0"
+                )
+                for ((key, value) in dxvkTuning) {
+                    val index = dxvkConfigLines.indexOfFirst {
+                        it.substringBefore("=").trim().equals(key, ignoreCase = true)
+                    }
+                    if (index >= 0) dxvkConfigLines[index] = "$key = $value"
+                    else dxvkConfigLines.add("$key = $value")
                 }
-                if (apitraceIndex >= 0) dxvkConfigLines[apitraceIndex] = "$apitraceKey = False"
-                else dxvkConfigLines.add("$apitraceKey = False")
                 dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
@@ -891,6 +953,7 @@ class MainActivity : Activity() {
             } catch (_: Exception) { null }
             return when (settings?.optString("resolution", "Native") ?: "Native") {
                 "480p" -> "854x480"
+                "540p" -> "960x540"
                 "600p" -> "1066x600"
                 "720p" -> "1280x720"
                 "900p" -> "1600x900"
@@ -961,12 +1024,61 @@ class MainActivity : Activity() {
                 }
                 val elements = data.optJSONArray("elements")
                 if (elements != null) {
-                    val iconIds = mapOf("FIRE" to 1, "AIM" to 2, "RELOAD" to 3, "JUMP" to 4, "USE" to 5, "RUN" to 6, "CROUCH" to 7, "MENU" to 8, "MAP" to 9)
+                    val iconIds = mapOf("FIRE" to 1, "AIM" to 2, "RELOAD" to 3, "JUMP" to 4,
+                        "USE" to 5, "RUN" to 6, "CROUCH" to 7, "MENU" to 8, "MAP" to 9)
+                    val labels = linkedSetOf<String>()
                     for (i in 0 until elements.length()) {
                         val item = elements.optJSONObject(i) ?: continue
-                        val iconId = iconIds[item.optString("text").uppercase()] ?: 0
+                        val binding = item.optJSONArray("bindings")?.optString(0, "NONE") ?: "NONE"
+                        var label = item.optString("text", "").uppercase()
+                        if (label.isBlank()) {
+                            label = when (item.optString("type")) {
+                                "D_PAD" -> "MOVE"
+                                "RADIAL_MENU" -> if (binding == "KEY_F") "ACTIONS" else "TOOLS"
+                                "RANGE_BUTTON" -> if (item.optString("range").contains("F1")) "FUNCTIONS" else "NUMBERS"
+                                else -> when (binding) {
+                                    "MOUSE_LEFT_BUTTON" -> "FIRE"
+                                    "MOUSE_RIGHT_BUTTON" -> "AIM"
+                                    "KEY_R" -> "RELOAD"
+                                    "KEY_SPACE" -> "JUMP"
+                                    "KEY_E" -> "USE"
+                                    "KEY_ENTER" -> "ENTER"
+                                    "KEY_ESC" -> "PAUSE"
+                                    "KEY_SHIFT_L" -> "SPRINT"
+                                    "KEY_CTRL_L" -> "CROUCH"
+                                    "KEY_TAB" -> "INVENTORY"
+                                    "KEY_ALT_L" -> "ALT"
+                                    else -> "BUTTON"
+                                }
+                            }
+                            item.put("text", label)
+                            changed = true
+                        }
+                        labels.add(label)
+                        val iconId = iconIds[label] ?: 0
                         if (iconId > 0 && item.optInt("iconId", 0) == 0) {
                             item.put("iconId", iconId)
+                            changed = true
+                        }
+                    }
+                    // Add dedicated, labeled actions without replacing or moving existing controls.
+                    val extras = listOf(
+                        arrayOf("GRENADE", "KEY_G", "0.68", "0.28"),
+                        arrayOf("MELEE", "KEY_V", "0.79", "0.28"),
+                        arrayOf("BINOCULARS", "KEY_B", "0.90", "0.28"),
+                        arrayOf("HEAL", "KEY_H", "0.68", "0.43"),
+                        arrayOf("MAP", "KEY_M", "0.79", "0.43"),
+                        arrayOf("WEAPON 2", "KEY_2", "0.90", "0.43"),
+                        arrayOf("WEAPON 3", "KEY_3", "0.68", "0.58"),
+                        arrayOf("WEAPON 4", "KEY_4", "0.79", "0.58"),
+                        arrayOf("FIRE MODE", "KEY_X", "0.90", "0.58")
+                    )
+                    for (entry in extras) {
+                        if (labels.add(entry[0])) {
+                            elements.put(JSONObject().put("type", "BUTTON").put("shape", "CIRCLE")
+                                .put("bindings", org.json.JSONArray().put(entry[1]))
+                                .put("scale", 0.76).put("x", entry[2].toDouble()).put("y", entry[3].toDouble())
+                                .put("toggleSwitch", false).put("text", entry[0]).put("iconId", 0))
                             changed = true
                         }
                     }
