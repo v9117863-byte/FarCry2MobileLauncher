@@ -18,6 +18,34 @@ file "$APP/assets/fc2-compat/opengl32.dll"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
 
+# Initialize safe snap metrics even when controls are positioned before the first draw pass.
+python3 - "$APP/java/com/winlator/widget/InputControlsView.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = """    public int getMaxWidth() {
+        return (int)Mathf.roundTo(getWidth(), snappingSize);
+    }
+
+    public int getMaxHeight() {
+        return (int)Mathf.roundTo(getHeight(), snappingSize);
+    }"""
+new = """    public int getMaxWidth() {
+        int unit = Math.max(1, snappingSize > 0 ? snappingSize : getWidth() / 100);
+        return (int)Mathf.roundTo(getWidth(), unit);
+    }
+
+    public int getMaxHeight() {
+        int unit = Math.max(1, snappingSize > 0 ? snappingSize : getWidth() / 100);
+        return (int)Mathf.roundTo(getHeight(), unit);
+    }"""
+if "snappingSize > 0 ? snappingSize : getWidth() / 100" not in s:
+    if old not in s: raise SystemExit("InputControlsView snap metric methods not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
+
 # Far Cry 2 uses stretch-to-fill at every virtual resolution. Upstream letterboxes.
 python3 - "$APP/java/com/winlator/renderer/FullscreenTransformation.java" <<'PY'
 from pathlib import Path
