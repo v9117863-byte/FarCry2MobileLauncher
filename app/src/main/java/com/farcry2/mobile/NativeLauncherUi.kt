@@ -208,7 +208,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         heading("OPTIONS", "GAME AND SYSTEM SETTINGS")
         section("Экран")
         val saved = try { JSONObject(actions.loadSettings()) } catch (_: Exception) { JSONObject() }
-        val resolution = spinner(listOf("360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "Native"),
+        val resolution = spinner(listOf("320p", "360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "1600p", "1800p", "2160p", "Native"),
             saved.optString("resolution", "Native"))
         body.addView(text("Разрешение игрового экрана", 12f, Color.WHITE)); body.addView(resolution)
         body.addView(text("Изображение: растянуть на весь экран, без чёрных полос", 11f, olive))
@@ -216,15 +216,15 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         val driver = spinner(listOf("Системный", "Turnip", "VirGL"),
             saved.optString("graphicsDriver", "Системный"))
         body.addView(text("Графический драйвер", 12f, Color.WHITE)); body.addView(driver)
-        val quality = spinner(listOf("Низкая", "Средняя", "Высокая"),
+        val quality = spinner(listOf("Очень низкая", "Низкая", "Средняя", "Высокая", "Максимальная"),
             saved.optString("performance", "Низкая"))
         body.addView(text("Профиль производительности", 12f, Color.WHITE)); body.addView(quality)
+        body.addView(text("Низкие профили экономят память и уменьшают нагрузку на GPU", 10f, olive))
         val touch = CheckBox(activity).apply {
             text = "Сенсорное управление"; setTextColor(Color.WHITE)
             isChecked = saved.optBoolean("touchControls", true)
         }
         body.addView(touch)
-        body.addView(button("Редактор управления") { showControlEditor() })
         body.addView(button("Сохранить настройки", true) {
             val json = JSONObject().put("resolution", resolution.selectedItem?.toString() ?: "540p")
                 .put("graphicsDriver", driver.selectedItem?.toString() ?: "Системный")
