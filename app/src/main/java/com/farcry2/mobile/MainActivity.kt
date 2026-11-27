@@ -204,6 +204,13 @@ class MainActivity : Activity() {
                 // before the launcher itself receives a Java exception.
                 val winlatorLog = File(dir, "Winlator/logs.txt")
                 val launcherLines = if (launcherLog.isFile) launcherLog.readLines(Charsets.UTF_8).takeLast(60) else listOf("Журнал лаунчера пуст")
+                // PulseAudio runs from app-internal filesDir, not the external Winlator log folder.
+                val pulseLog = File(filesDir, "pulseaudio/pulseaudio.log")
+                val pulseLines = if (pulseLog.isFile) pulseLog.readLines(Charsets.UTF_8).takeLast(180)
+                    else listOf("pulseaudio.log не создан — сервер мог не запуститься")
+                val pulseConfig = File(filesDir, "pulseaudio/default.pa")
+                val pulseConfigLines = if (pulseConfig.isFile) pulseConfig.readLines(Charsets.UTF_8)
+                    else listOf("default.pa не создан")
                 val winlatorAllLines = if (winlatorLog.isFile) winlatorLog.readLines(Charsets.UTF_8) else emptyList()
                 val winlatorLines = if (winlatorAllLines.isNotEmpty()) winlatorAllLines.takeLast(120) else listOf("Журнал Wine/Box64 пока не создан")
                 // Keep module-load records: the crashing IP must be mapped to its loaded DLL.
@@ -240,6 +247,8 @@ class MainActivity : Activity() {
                     "\\n\\nWINE MODULE MAP (loaded DLLs):\\n" + (if (moduleMapLines.isNotEmpty()) moduleMapLines.joinToString("\\n") else "Строки загрузки модулей не найдены") +
                     "\\n\\nWINE CRASH CONTEXT:\\n" + (if (crashContextLines.isNotEmpty()) crashContextLines.joinToString("\\n") else "Строки исключения не найдены") +
                     "\\n\\nWINE LOADER / MISSING PROCEDURE ERRORS:\\n" + (if (loaderErrorLines.isNotEmpty()) loaderErrorLines.joinToString("\\n") else "Ошибки загрузчика и отсутствующие процедуры не обнаружены") +
+                    "\\n\\nPULSEAUDIO CONFIG:\\n" + pulseConfigLines.joinToString("\\n") +
+                    "\\n\\nPULSEAUDIO LOG:\\n" + pulseLines.joinToString("\\n") +
                     "\\n\\nDXVK:\\n" + dxvkLogs.joinToString("\\n")
             } catch (e: Exception) {
                 "Не удалось прочитать журналы: " + (e.message ?: "неизвестная ошибка")
