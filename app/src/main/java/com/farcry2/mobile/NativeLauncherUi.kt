@@ -208,7 +208,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         heading("OPTIONS", "GAME AND SYSTEM SETTINGS")
         section("Экран")
         val saved = try { JSONObject(actions.loadSettings()) } catch (_: Exception) { JSONObject() }
-        val resolution = spinner(listOf("480p", "540p", "600p", "720p", "900p", "1080p", "Native"),
+        val resolution = spinner(listOf("360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "Native"),
             saved.optString("resolution", "Native"))
         body.addView(text("Разрешение игрового экрана", 12f, Color.WHITE)); body.addView(resolution)
         body.addView(text("Изображение: растянуть на весь экран, без чёрных полос", 11f, olive))
