@@ -1760,7 +1760,7 @@ if "PULSEAUDIO_PROCESS pid=" not in s:
     if old not in s: raise SystemExit("PulseAudio process command marker not found")
     s = s.replace(old, new, 1)
 old = 'command += " --fail=false";'
-new = 'command += " --fail=true";\\n        command += " --resample-method=src-sinc-fastest";'
+new = 'command += " --fail=true";\n        command += " --resample-method=src-sinc-fastest";'
 if new not in s:
     if old not in s: raise SystemExit("PulseAudio fail option marker not found")
     s = s.replace(old, new, 1)
