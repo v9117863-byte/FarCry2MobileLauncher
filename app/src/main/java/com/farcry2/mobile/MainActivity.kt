@@ -717,8 +717,8 @@ class MainActivity : Activity() {
                 container.setScreenSize(resolveRequestedScreenSize())
                 container.setAudioDriver(com.winlator.container.AudioDrivers.PULSEAUDIO)
                 // Keep a real AAudio sink, full volume and a stable low-latency PulseAudio buffer.
-                container.setAudioDriverConfig("performanceMode=1,volume=1.0,latencyMillis=16")
-                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio config=performanceMode:1,volume:1.0,latencyMillis:16; Wine registry and XEnvironment socket are forced")
+                container.setAudioDriverConfig("performanceMode=1,volume=1.0,latencyMillis=32")
+                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio config=performanceMode:1,volume:1.0,latencyMillis:32; Wine registry and XEnvironment socket are forced")
                 // Far Cry 2 reads its renderer from GamerProfile.xml; seed DX9 before its first run.
                 val fc2ProfileDir = File(container.getUserDir(), "Documents/My Games/Far Cry 2")
                 if (!fc2ProfileDir.isDirectory && !fc2ProfileDir.mkdirs()) {
@@ -759,7 +759,7 @@ class MainActivity : Activity() {
                         "AspectRatio" to "0",
                         "ResolutionX" to profileWidth.toString(),
                         "ResolutionY" to profileHeight.toString(),
-                        "VSync" to "0",
+                        "VSync" to "1",
                         "MultiSampleMode" to "0",
                         "AlphaToCoverage" to "0",
                         "Hdr" to "0",
@@ -904,8 +904,9 @@ class MainActivity : Activity() {
                 }
                 val dxvkTuning = linkedMapOf(
                     "d3d9.apitraceMode" to "False",
-                    "d3d9.maxFrameLatency" to "1",
-                    "d3d9.presentInterval" to "0"
+                    "d3d9.maxFrameLatency" to "2",
+                    "d3d9.presentInterval" to "1",
+                    "dxgi.maxFrameRate" to "30"
                 )
                 for ((key, value) in dxvkTuning) {
                     val index = dxvkConfigLines.indexOfFirst {
@@ -917,7 +918,7 @@ class MainActivity : Activity() {
                 dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
-                    " customVendorId=unset adapterIdentity=native apitraceMode=False")
+                    " customVendorId=unset adapterIdentity=native apitraceMode=False vsync=1 frameCap=30 maxFrameLatency=2")
                 gameEnv.put("DXVK_LOG_LEVEL", "warn")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "-all")
