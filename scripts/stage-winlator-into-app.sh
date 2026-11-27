@@ -1709,16 +1709,23 @@ old = '''            if (fc2Profile != null) {
                 fc2Profile.save();
                 showInputControls(fc2Profile);'''
 new = '''            if (fc2Profile != null) {
-                fc2Profile.loadElements(inputControlsView);
-                for (com.winlator.inputcontrols.ControlElement element : fc2Profile.getElements()) {
-                    if (element.getType() == com.winlator.inputcontrols.ControlElement.Type.D_PAD ||
-                        element.getType() == com.winlator.inputcontrols.ControlElement.Type.TRACKPAD) {
-                        element.setOpacity(0.0f);
-                    }
-                }
                 fc2Profile.setHideMouseCursor(true);
-                fc2Profile.save();
-                showInputControls(fc2Profile);'''
+                showInputControls(fc2Profile);
+                inputControlsView.post(() -> {
+                    // Wait for measured dimensions before translating normalized coordinates.
+                    fc2Profile.loadElements(inputControlsView);
+                    for (com.winlator.inputcontrols.ControlElement element : fc2Profile.getElements()) {
+                        if (element.getType() == com.winlator.inputcontrols.ControlElement.Type.D_PAD ||
+                            element.getType() == com.winlator.inputcontrols.ControlElement.Type.TRACKPAD) {
+                            element.setOpacity(0.0f);
+                        }
+                    }
+                    fc2Profile.save();
+                    inputControlsView.invalidate();
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine(
+                        "FC2_TOUCH_CONTROLS profile=4 name=" + fc2Profile.getName() +
+                        " elements=" + fc2Profile.getElements().size() + " movementZonesInvisible=true");
+                });'''
 if "element.setOpacity(0.0f)" not in s:
     if old not in s: raise SystemExit("FC2 touch profile activation block not found")
     s = s.replace(old, new, 1)
