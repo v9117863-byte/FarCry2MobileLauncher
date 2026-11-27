@@ -823,26 +823,26 @@ class MainActivity : Activity() {
                         "AmbientQuality" to "low", "ShadowQuality" to "off",
                         "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
                     "Высокая" -> linkedMapOf(
-                        "EnvironmentQuality" to "high", "AntiPortalQuality" to "low",
+                        "EnvironmentQuality" to "high", "AntiPortalQuality" to "high",
                         "PostFxQuality" to "medium", "TextureQuality" to "high",
                         "TextureResolutionQuality" to "high", "WaterQuality" to "medium",
-                        "DepthPassQuality" to "low", "VegetationQuality" to "medium",
+                        "DepthPassQuality" to "high", "VegetationQuality" to "medium",
                         "TerrainQuality" to "high", "GeometryQuality" to "high",
                         "AmbientQuality" to "medium", "ShadowQuality" to "low",
                         "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
                     "Средняя" -> linkedMapOf(
-                        "EnvironmentQuality" to "medium", "AntiPortalQuality" to "high",
+                        "EnvironmentQuality" to "medium", "AntiPortalQuality" to "low",
                         "PostFxQuality" to "low", "TextureQuality" to "medium",
                         "TextureResolutionQuality" to "medium", "WaterQuality" to "low",
-                        "DepthPassQuality" to "high", "VegetationQuality" to "low",
+                        "DepthPassQuality" to "low", "VegetationQuality" to "low",
                         "TerrainQuality" to "medium", "GeometryQuality" to "medium",
                         "AmbientQuality" to "low", "ShadowQuality" to "off",
                         "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
                     else -> linkedMapOf(
-                        "EnvironmentQuality" to "low", "AntiPortalQuality" to "high",
+                        "EnvironmentQuality" to "low", "AntiPortalQuality" to "low",
                         "PostFxQuality" to "low", "TextureQuality" to "low",
                         "TextureResolutionQuality" to "low", "WaterQuality" to "low",
-                        "DepthPassQuality" to "high", "VegetationQuality" to "low",
+                        "DepthPassQuality" to "low", "VegetationQuality" to "low",
                         "TerrainQuality" to "low", "GeometryQuality" to "low",
                         "AmbientQuality" to "low", "ShadowQuality" to "off",
                         "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
