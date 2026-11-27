@@ -1887,3 +1887,56 @@ if new not in s:
     s = s.replace(old, new, 1)
 p.write_text(s)
 PY
+
+# Final runtime corrections: Android immersive fullscreen and a clean AAudio
+# PulseAudio configuration. The AAudio module exports its default sink as
+# "AAudioSink"; sink_name is not a supported module argument in this build,
+# and pactl-only set-sink commands do not belong in default.pa.
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+marker = "        rootView.addView(inputControlsView);"
+if "FC2_ANDROID_IMMERSIVE_FULLSCREEN" not in s:
+    if marker not in s:
+        raise SystemExit("XServer input overlay insertion marker missing for immersive fullscreen")
+    replacement = marker + """
+        // FC2_ANDROID_IMMERSIVE_FULLSCREEN: hide Android system bars while the game runs.
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().getDecorView().setSystemUiVisibility(
+            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN |
+            android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+"""
+    s = s.replace(marker, replacement, 1)
+p.write_text(s)
+PY
+python3 - "$APP/java/com/winlator/xenvironment/components/PulseAudioComponent.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+s = s.replace('module-aaudio-sink sink_name=AAudioSink volume=', 'module-aaudio-sink volume=')
+s = s.replace('            "set-sink-mute AAudioSink 0",\\n', '')
+s = s.replace('            "set-sink-volume AAudioSink 100%",\\n', '')
+# Keep one explicit default sink command; the module's built-in sink name is AAudioSink.
+if '"set-default-sink AAudioSink"' not in s:
+    s = s.replace('"load-module module-aaudio-sink volume="+volume+" performance_mode="+performanceMode',
+                  '"load-module module-aaudio-sink volume="+volume+" performance_mode="+performanceMode",\\n            "set-default-sink AAudioSink"')
+# Remove duplicate default sink lines while retaining the first.
+lines = s.splitlines()
+seen = False
+out = []
+for line in lines:
+    if '"set-default-sink AAudioSink"' in line:
+        if seen:
+            continue
+        seen = True
+    out.append(line)
+s = "\\n".join(out) + "\\n"
+p.write_text(s)
+PY
