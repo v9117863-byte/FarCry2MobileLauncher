@@ -563,8 +563,21 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
                         val now=event.eventTime
                         if(dragging==lastTapIndex && now-lastTapAt<320L){
                             val item=elements.optJSONObject(dragging)
-                            item?.put("scale",(item.optDouble("scale",0.9)+0.1).coerceAtMost(1.6))
-                            onLayoutChanged?.invoke()
+                            if (item != null) {
+                                val currentScale = item.optDouble("scale", 0.9).toFloat()
+                                val minScale = 0.5f
+                                val maxScale = 1.6f
+                                val step = 0.1f
+                                // Double-tap cycles through sizes. Reaching the maximum
+                                // wraps directly to the minimum instead of getting stuck.
+                                val nextScale = if (currentScale >= maxScale - 0.001f) {
+                                    minScale
+                                } else {
+                                    (currentScale + step).coerceAtMost(maxScale)
+                                }
+                                item.put("scale", nextScale)
+                                onLayoutChanged?.invoke()
+                            }
                             lastTapIndex=-1
                         } else {lastTapIndex=dragging;lastTapAt=now}
                     }
