@@ -1940,3 +1940,18 @@ for line in lines:
 s = "\n".join(out) + "\n"
 p.write_text(s)
 PY
+
+# Make Wine explicitly use the same AAudio sink exposed by the PulseAudio server.
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+marker = '            envVars.put("PULSE_SERVER", rootPath+UnixSocketConfig.PULSE_SERVER_PATH);'
+replacement = marker + '\\n            envVars.put("PULSE_SINK", "AAudioSink");'
+if 'envVars.put("PULSE_SINK", "AAudioSink");' not in s:
+    if marker not in s:
+        raise SystemExit("Wine PULSE_SERVER environment insertion point not found")
+    s = s.replace(marker, replacement, 1)
+p.write_text(s)
+PY
