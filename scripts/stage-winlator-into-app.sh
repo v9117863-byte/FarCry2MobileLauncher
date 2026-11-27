@@ -1416,30 +1416,39 @@ while IFS= read -r -d '' file; do
   cp "$file" "$APP/assets/$rel"
 done < <(find "$UPSTREAM/app/src/main/assets" -type f -print0)
 
-# Seed the Far Cry 2 touch layout as profile 4. The launcher editor reads and
-# writes this same profile; cursor remains visible for mouse/trackpad use.
+# Seed the complete Far Cry 2 PC control map as profile 4.
+# One virtual stick handles WASD; compact labeled buttons cover the remaining default bindings.
 python3 - "$APP/assets/inputcontrols/profiles/controls-4.icp" <<'PY'
 import json, sys
 from pathlib import Path
 p = Path(sys.argv[1])
-profile = {
-  "id": 4, "name": "FPS", "cursorSpeed": 1.35, "hideMouseCursor": False,
-  "elements": [
-    {"type":"D_PAD","shape":"CIRCLE","bindings":["KEY_W","KEY_D","KEY_S","KEY_A"],"scale":1.15,"x":0.13,"y":0.74,"toggleSwitch":False,"text":"MOVE","iconId":0},
-    {"type":"TRACKPAD","shape":"CIRCLE","bindings":["MOUSE_MOVE_UP","MOUSE_MOVE_RIGHT","MOUSE_MOVE_DOWN","MOUSE_MOVE_LEFT"],"scale":1.25,"x":0.77,"y":0.49,"toggleSwitch":False,"text":"LOOK","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["MOUSE_LEFT_BUTTON","NONE","NONE","NONE"],"scale":1.12,"x":0.91,"y":0.77,"toggleSwitch":False,"text":"FIRE","iconId":1},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["MOUSE_RIGHT_BUTTON","NONE","NONE","NONE"],"scale":1.0,"x":0.72,"y":0.77,"toggleSwitch":False,"text":"AIM","iconId":2},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_R","NONE","NONE","NONE"],"scale":0.88,"x":0.91,"y":0.55,"toggleSwitch":False,"text":"RELOAD","iconId":3},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SPACE","NONE","NONE","NONE"],"scale":0.88,"x":0.78,"y":0.91,"toggleSwitch":False,"text":"JUMP","iconId":4},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_E","NONE","NONE","NONE"],"scale":0.88,"x":0.62,"y":0.91,"toggleSwitch":False,"text":"USE","iconId":5},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_SHIFT_L","NONE","NONE","NONE"],"scale":0.88,"x":0.13,"y":0.93,"toggleSwitch":True,"text":"RUN","iconId":6},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_CTRL_L","NONE","NONE","NONE"],"scale":0.88,"x":0.31,"y":0.93,"toggleSwitch":True,"text":"CROUCH","iconId":7},
-    {"type":"BUTTON","shape":"ROUND_RECT","bindings":["KEY_ESC","NONE","NONE","NONE"],"scale":0.78,"x":0.49,"y":0.93,"toggleSwitch":False,"text":"MENU","iconId":8},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_G","NONE","NONE","NONE"],"scale":0.78,"x":0.91,"y":0.34,"toggleSwitch":False,"text":"GRENADE","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_V","NONE","NONE","NONE"],"scale":0.78,"x":0.77,"y":0.34,"toggleSwitch":False,"text":"MELEE","iconId":0},
-    {"type":"BUTTON","shape":"CIRCLE","bindings":["KEY_1","NONE","NONE","NONE"],"scale":0.78,"x":0.63,"y":0.34,"toggleSwitch":False,"text":"WEAPON","iconId":0}
-  ]
-}
+elements = [
+  {"type":"D_PAD","shape":"CIRCLE","bindings":["KEY_W","KEY_D","KEY_S","KEY_A"],"scale":0.98,"x":0.13,"y":0.75,"toggleSwitch":False,"text":"MOVE","iconId":0},
+  {"type":"TRACKPAD","shape":"CIRCLE","bindings":["MOUSE_MOVE_UP","MOUSE_MOVE_RIGHT","MOUSE_MOVE_DOWN","MOUSE_MOVE_LEFT"],"scale":1.15,"x":0.48,"y":0.50,"toggleSwitch":False,"text":"LOOK","iconId":0},
+]
+# Compact 3-column action grid. These are the standard Far Cry 2 PC bindings:
+# LMB/RMB, R, E, Space, Shift, C, Q, F, H, 1-5, mouse wheel, Esc, F5 and F9.
+actions = [
+  ("FIRE","MOUSE_LEFT_BUTTON"), ("AIM","MOUSE_RIGHT_BUTTON"), ("RELOAD","KEY_R"),
+  ("USE","KEY_E"), ("JUMP","KEY_SPACE"), ("SPRINT","KEY_SHIFT_L"),
+  ("CROUCH / SEAT","KEY_C"), ("THROW","KEY_Q"), ("SWITCH THROW","KEY_F"),
+  ("HEAL","KEY_H"), ("MACHETE","KEY_1"), ("SECONDARY","KEY_2"),
+  ("PRIMARY","KEY_3"), ("SPECIAL","KEY_4"), ("MAP / PHONE","KEY_5"),
+  ("NEXT WEAPON","MOUSE_SCROLL_UP"), ("PREV WEAPON","MOUSE_SCROLL_DOWN"),
+  ("PAUSE","KEY_ESC"), ("QUICK SAVE","KEY_F5"), ("QUICK LOAD","KEY_F9")
+]
+xs = [0.69, 0.80, 0.91]
+ys = [0.29, 0.395, 0.50, 0.605, 0.71, 0.815, 0.92]
+for i, (label, binding) in enumerate(actions):
+    col, row = i % 3, i // 3
+    scale = 0.82 if binding in ("MOUSE_LEFT_BUTTON","MOUSE_RIGHT_BUTTON") else 0.62
+    elements.append({
+      "type":"BUTTON","shape":"CIRCLE",
+      "bindings":[binding,"NONE","NONE","NONE"],
+      "scale":scale,"x":xs[col],"y":ys[row],
+      "toggleSwitch":False,"text":label,"iconId":0
+    })
+profile = {"id":4,"name":"FPS","cursorSpeed":1.35,"hideMouseCursor":False,"elements":elements}
 p.parent.mkdir(parents=True, exist_ok=True)
 p.write_text(json.dumps(profile, separators=(",",":")) + "\n")
 PY
@@ -1473,19 +1482,69 @@ new = """        boolean customControlsApplied = false;
         if (!customControlsApplied) {
             ControlsProfile fc2Profile = inputControlsManager.getProfile(4);
             if (fc2Profile != null) {
-                fc2Profile.setHideMouseCursor(false);
-                fc2Profile.save();
+                fc2Profile.setHideMouseCursor(true);
                 showInputControls(fc2Profile);
-                com.winlator.core.ProcessHelper.appendDiagnosticLine(
-                    "FC2_TOUCH_CONTROLS profile=4 name=" + fc2Profile.getName() +
-                    " elements=" + fc2Profile.getElements().size() + " cursorHidden=false");
+                inputControlsView.post(() -> {
+                    fc2Profile.loadElements(inputControlsView);
+                    float w = inputControlsView.getMaxWidth();
+                    float h = inputControlsView.getMaxHeight();
+                    for (com.winlator.inputcontrols.ControlElement element : fc2Profile.getElements()) {
+                        if (element.getType() == com.winlator.inputcontrols.ControlElement.Type.D_PAD) {
+                            element.setX((int)(w * 0.13f));
+                            element.setY((int)(h * 0.75f));
+                            element.setScale(0.98f);
+                            element.setOpacity(0.62f);
+                        }
+                        else if (element.getType() == com.winlator.inputcontrols.ControlElement.Type.TRACKPAD) {
+                            element.setOpacity(0.0f);
+                        }
+                        else if (element.getType() == com.winlator.inputcontrols.ControlElement.Type.BUTTON) {
+                            String binding = element.getBindingAt(0).name();
+                            int index = -1;
+                            switch (binding) {
+                                case "MOUSE_LEFT_BUTTON": index = 0; break;
+                                case "MOUSE_RIGHT_BUTTON": index = 1; break;
+                                case "KEY_R": index = 2; break;
+                                case "KEY_E": index = 3; break;
+                                case "KEY_SPACE": index = 4; break;
+                                case "KEY_SHIFT_L": index = 5; break;
+                                case "KEY_C": index = 6; break;
+                                case "KEY_Q": index = 7; break;
+                                case "KEY_F": index = 8; break;
+                                case "KEY_H": index = 9; break;
+                                case "KEY_1": index = 10; break;
+                                case "KEY_2": index = 11; break;
+                                case "KEY_3": index = 12; break;
+                                case "KEY_4": index = 13; break;
+                                case "KEY_5": index = 14; break;
+                                case "MOUSE_SCROLL_UP": index = 15; break;
+                                case "MOUSE_SCROLL_DOWN": index = 16; break;
+                                case "KEY_ESC": index = 17; break;
+                                case "KEY_F5": index = 18; break;
+                                case "KEY_F9": index = 19; break;
+                            }
+                            if (index >= 0) {
+                                float[] xs = {0.69f,0.80f,0.91f};
+                                float[] ys = {0.29f,0.395f,0.50f,0.605f,0.71f,0.815f,0.92f};
+                                element.setX((int)(w * xs[index % 3]));
+                                element.setY((int)(h * ys[index / 3]));
+                                element.setScale(index < 2 ? 0.82f : 0.62f);
+                            }
+                        }
+                    }
+                    fc2Profile.save();
+                    inputControlsView.invalidate();
+                    com.winlator.core.ProcessHelper.appendDiagnosticLine(
+                        "FC2_TOUCH_CONTROLS profile=4 elements=" + fc2Profile.getElements().size() +
+                        " movementStick=visible lookSurface=hidden completePCBindings=20 compact=true");
+                });
             }
         }
 
         if (MainActivity.DEBUG_MODE)"""
-if "FC2_TOUCH_CONTROLS profile=4" not in s:
+if "completePCBindings=20" not in s:
     if old not in s: raise SystemExit("setupUI controls-profile insertion point missing")
-    s = s.replace(old, new, 1)
+    s=s.replace(old,new,1)
 p.write_text(s)
 PY
 
