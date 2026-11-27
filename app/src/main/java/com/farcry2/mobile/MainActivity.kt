@@ -785,9 +785,9 @@ class MainActivity : Activity() {
                 if (soundTag != null) {
                     var attrs = soundTag.value
                     for ((key, value) in linkedMapOf("MusicEnabled" to "1", "MasterVolume" to "100")) {
-                        val attr = Regex("\\b" + Regex.escape(key) + "=\\"[^\\"]*\\"")
-                        attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "$key=\\"$value\\"")
-                            else attrs.dropLast(2) + " $key=\\"$value\\"/>"
+                        val attr = Regex("\\b" + Regex.escape(key) + "=\"[^\"]*\"")
+                        attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "$key=\"$value\"")
+                            else attrs.dropLast(2) + " $key=\"$value\"/>"
                     }
                     normalizedProfile = normalizedProfile.replaceRange(soundTag.range, attrs)
                 }
@@ -824,9 +824,9 @@ class MainActivity : Activity() {
                 if (qualityTag != null) {
                     var attrs = qualityTag.value
                     for ((key, value) in qualityValues) {
-                        val attr = Regex("\\b" + Regex.escape(key) + "=\\"[^\\"]*\\"")
-                        attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "$key=\\"$value\\"")
-                            else attrs.dropLast(2) + " $key=\\"$value\\"/>"
+                        val attr = Regex("\\b" + Regex.escape(key) + "=\"[^\"]*\"")
+                        attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "$key=\"$value\"")
+                            else attrs.dropLast(2) + " $key=\"$value\"/>"
                     }
                     normalizedProfile = normalizedProfile.replaceRange(qualityTag.range, attrs)
                 }
