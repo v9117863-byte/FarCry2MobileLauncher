@@ -732,7 +732,7 @@ class MainActivity : Activity() {
                     fc2Profile.writeText(
                         """<GamerProfile>
 <SoundProfile MusicEnabled="1" MasterVolume="100"/>
-<RenderProfile MultiSampleMode="0" AlphaToCoverage="0" ResolutionX="$profileWidth" ResolutionY="$profileHeight" Quality="custom" Fullscreen="1" Maximized="1" ForceWidescreen="1" AspectRatio="0" VSync="1" RefreshRate="60" DisableMip0Loading="0" MaxDriverBufferedFrames="2" Platform="d3d9" ShowFPS="0" ClustersZPassMaxLOD="1" Brightness="1" Contrast="1" GammaRamp="1" GammaRampR="1" GammaRampG="1" GammaRampB="1" AllowAsynchShaderLoading="1">
+<RenderProfile MultiSampleMode="0" AlphaToCoverage="0" ResolutionX="$profileWidth" ResolutionY="$profileHeight" Quality="custom" Fullscreen="1" Maximized="1" ForceWidescreen="1" AspectRatio="0" VSync="1" RefreshRate="60" DisableMip0Loading="0" MaxDriverBufferedFrames="1" Platform="d3d9" ShowFPS="0" ClustersZPassMaxLOD="1" Brightness="1" Contrast="1" GammaRamp="1" GammaRampR="1" GammaRampG="1" GammaRampB="1" AllowAsynchShaderLoading="1">
 <CustomQuality><quality ResolutionX="$profileWidth" ResolutionY="$profileHeight" EnvironmentQuality="low" AntiPortalQuality="high" PostFxQuality="low" TextureQuality="low" TextureResolutionQuality="low" WaterQuality="low" DepthPassQuality="high" VegetationQuality="low" TerrainQuality="low" GeometryQuality="low" AmbientQuality="low" ShadowQuality="off" Hdr="0" HdrFP32="0" Bloom="0" id="custom"/></CustomQuality>
 </RenderProfile>
 <NetworkProfile CustomMapMaxUploadRateOnline="10240" OnlineEnginePort="9000" OnlineServicePort="9001" FileTransferHostPort="9002" FileTransferClientPort="9003" LanBroadcastPort="9004" ScanFreePorts="1" ScanPortRange="1000" ScanPortStart="9000" SessionProvider="" DetectPublicAddress="1" MaxUploadOnline="768"><Accounts/></NetworkProfile>
@@ -766,7 +766,7 @@ class MainActivity : Activity() {
                         "HdrFP32" to "0",
                         "Bloom" to "0",
                         "AllowAsynchShaderLoading" to "1",
-                        "MaxDriverBufferedFrames" to "2"
+                        "MaxDriverBufferedFrames" to "1"
                     )
                     for ((key, value) in forcedAttrs) {
                         val attr = Regex("\\b" + Regex.escape(key) + "=\"[^\"]*\"")
@@ -794,6 +794,16 @@ class MainActivity : Activity() {
                 val selectedPerformance = try {
                     prefs.getString("launch_settings", null)?.let { JSONObject(it).optString("performance", "Низкая") }
                 } catch (_: Exception) { "Низкая" } ?: "Низкая"
+                // Low/medium presets skip the largest base mip to reduce resident texture memory.
+                val mip0Loading = if (selectedPerformance == "Высокая") "0" else "1"
+                val mipRenderTag = Regex("<RenderProfile\\b[^>]*>").find(normalizedProfile)
+                if (mipRenderTag != null) {
+                    var attrs = mipRenderTag.value
+                    val attr = Regex("\\bDisableMip0Loading=\\"[^\\"]*\\"")
+                    attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "DisableMip0Loading=\\"$mip0Loading\\"")
+                        else attrs.dropLast(1) + " DisableMip0Loading=\\"$mip0Loading\\">"
+                    normalizedProfile = normalizedProfile.replaceRange(mipRenderTag.range, attrs)
+                }
                 val qualityValues = when (selectedPerformance) {
                     "Высокая" -> linkedMapOf(
                         "EnvironmentQuality" to "high", "AntiPortalQuality" to "high",
