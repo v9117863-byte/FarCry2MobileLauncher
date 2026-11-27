@@ -1698,6 +1698,21 @@ if "FC2_IN_GAME_CONTROL_EDITOR" not in s:
         if (container != null"""
     insert = """        rootView.addView(inputControlsView);
 
+        // FC2_SHOW_KEYBOARD: expose Winlator's existing Android IME action in-game.
+        Button showKeyboardButton = new Button(this);
+        showKeyboardButton.setText("⌨ ВВОД");
+        showKeyboardButton.setTextSize(12);
+        showKeyboardButton.setAllCaps(false);
+        showKeyboardButton.setAlpha(0.84f);
+        FrameLayout.LayoutParams keyboardButtonParams = new FrameLayout.LayoutParams(
+            (int)(104 * getResources().getDisplayMetrics().density),
+            (int)(44 * getResources().getDisplayMetrics().density));
+        keyboardButtonParams.gravity = android.view.Gravity.TOP | android.view.Gravity.LEFT;
+        keyboardButtonParams.topMargin = (int)(12 * getResources().getDisplayMetrics().density);
+        keyboardButtonParams.leftMargin = (int)(12 * getResources().getDisplayMetrics().density);
+        rootView.addView(showKeyboardButton, keyboardButtonParams);
+        showKeyboardButton.setOnClickListener(v -> AppUtils.showKeyboard(XServerDisplayActivity.this));
+
         // FC2_IN_GAME_CONTROL_EDITOR: edit the actual overlay without leaving the game.
         Button editControlsButton = new Button(this);
         editControlsButton.setText("✎");
@@ -1776,9 +1791,10 @@ s = p.read_text()
 old = '''            "load-module module-aaudio-sink volume="+volume+" performance_mode="+performanceMode,
             "set-default-sink AAudioSink"
         ));'''
-new = '''            "load-module module-aaudio-sink volume="+volume+" performance_mode="+performanceMode,
+new = '''            "load-module module-aaudio-sink sink_name=AAudioSink volume="+volume+" performance_mode="+performanceMode,
             "set-default-sink AAudioSink",
-            "set-sink-mute AAudioSink 0"
+            "set-sink-mute AAudioSink 0",
+            "set-sink-volume AAudioSink 100%"
         ));'''
 if "set-sink-mute AAudioSink 0" not in s:
     if old not in s: raise SystemExit("Upstream PulseAudio AAudio sink block not found")
