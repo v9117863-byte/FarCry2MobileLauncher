@@ -799,9 +799,9 @@ class MainActivity : Activity() {
                 val mipRenderTag = Regex("<RenderProfile\\b[^>]*>").find(normalizedProfile)
                 if (mipRenderTag != null) {
                     var attrs = mipRenderTag.value
-                    val attr = Regex("\\bDisableMip0Loading=\\"[^\\"]*\\"")
-                    attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "DisableMip0Loading=\\"$mip0Loading\\"")
-                        else attrs.dropLast(1) + " DisableMip0Loading=\\"$mip0Loading\\">"
+                    val attr = Regex("\\bDisableMip0Loading=\"[^\"]*\"")
+                    attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "DisableMip0Loading=\"$mip0Loading\"")
+                        else attrs.dropLast(1) + " DisableMip0Loading=\"$mip0Loading\">"
                     normalizedProfile = normalizedProfile.replaceRange(mipRenderTag.range, attrs)
                 }
                 val qualityValues = when (selectedPerformance) {
