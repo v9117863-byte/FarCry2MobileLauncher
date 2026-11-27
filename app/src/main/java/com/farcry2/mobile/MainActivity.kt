@@ -746,8 +746,8 @@ class MainActivity : Activity() {
 </RenderProfile>
 <NetworkProfile CustomMapMaxUploadRateOnline="10240" OnlineEnginePort="9000" OnlineServicePort="9001" FileTransferHostPort="9002" FileTransferClientPort="9003" LanBroadcastPort="9004" ScanFreePorts="1" ScanPortRange="1000" ScanPortStart="9000" SessionProvider="" DetectPublicAddress="1" MaxUploadOnline="768"><Accounts/></NetworkProfile>
 <GameProfile Sensitivity="1" Invert_y="0" UseMouseSmooth="0" Smoothness="1" Smoothness_Ironsight="1" HelpCrosshair="0" UseCompassMiniMap="1" UseRoadSignHilight="1" UseSubtitles="1" UseAmbx="0" Autosave="1" Machete="0" DifficultyLevel="1" ClanTag=""><FireConfig QualitySetting="VeryHigh"/></GameProfile>
-<RealTreeProfile Quality="VeryHigh"><CustomQuality/></RealTreeProfile>
-<EngineProfile><PhysicConfig QualitySetting="VeryHigh"/><QcConfig GatherFPS="1" GatherAICnt="1" IsQcTester="0"/><InputConfig/></EngineProfile>
+<RealTreeProfile Quality="Low"><CustomQuality/></RealTreeProfile>
+<EngineProfile><PhysicConfig QualitySetting="Low"/><QcConfig GatherFPS="1" GatherAICnt="1" IsQcTester="0"/><InputConfig/></EngineProfile>
 </GamerProfile>"""
                     )
                 } else {
@@ -812,6 +812,29 @@ class MainActivity : Activity() {
                     attrs = if (attr.containsMatchIn(attrs)) attr.replace(attrs, "DisableMip0Loading=\"$mip0Loading\"")
                         else attrs.dropLast(1) + " DisableMip0Loading=\"$mip0Loading\">"
                     normalizedProfile = normalizedProfile.replaceRange(mipRenderTag.range, attrs)
+                }
+                val realTreeQuality = when (selectedPerformance) {
+                    "Высокая" -> "VeryHigh"
+                    "Средняя" -> "Medium"
+                    else -> "Low"
+                }
+                val physicsQuality = when (selectedPerformance) {
+                    "Высокая" -> "High"
+                    "Средняя" -> "Medium"
+                    else -> "Low"
+                }
+                // RealTree and physics have separate CPU-heavy profile nodes.
+                val realTreeTag = Regex("<RealTreeProfile\\b[^>]*>").find(normalizedProfile)
+                if (realTreeTag != null) {
+                    val attrs = realTreeTag.value.replace(Regex("\\bQuality=\"[^\"]*\""),
+                        "Quality=\"$realTreeQuality\"")
+                    normalizedProfile = normalizedProfile.replaceRange(realTreeTag.range, attrs)
+                }
+                val physicsTag = Regex("<PhysicConfig\\b[^>]*/>").find(normalizedProfile)
+                if (physicsTag != null) {
+                    val attrs = physicsTag.value.replace(Regex("\\bQualitySetting=\"[^\"]*\""),
+                        "QualitySetting=\"$physicsQuality\"")
+                    normalizedProfile = normalizedProfile.replaceRange(physicsTag.range, attrs)
                 }
                 val qualityValues = when (selectedPerformance) {
                     "Минимальная" -> linkedMapOf(
@@ -981,7 +1004,7 @@ class MainActivity : Activity() {
             val settings = try {
                 prefs.getString("launch_settings", null)?.let { JSONObject(it) }
             } catch (_: Exception) { null }
-            return when (settings?.optString("resolution", "Native") ?: "Native") {
+            return when (settings?.optString("resolution", "540p") ?: "540p") {
                 "144p" -> "256x144"
                 "240p" -> "426x240"
                 "320p" -> "568x320"
@@ -1182,7 +1205,7 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun loadLaunchSettings(): String =
             prefs.getString("launch_settings", null) ?: JSONObject()
-                .put("resolution", "Native")
+                .put("resolution", "540p")
                 .put("graphicsDriver", "Системный")
                 .put("performance", "Низкая")
                 .put("touchControls", true)
