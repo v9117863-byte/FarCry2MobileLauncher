@@ -221,7 +221,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         heading("OPTIONS", "GAME AND SYSTEM SETTINGS")
         section("Экран")
         val saved = try { JSONObject(actions.loadSettings()) } catch (_: Exception) { JSONObject() }
-        val resolution = spinner(listOf("320p", "360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "1600p", "1800p", "2160p", "Native"),
+        val resolution = spinner(listOf("144p", "240p", "320p", "360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "1600p", "1800p", "2160p", "Native"),
             saved.optString("resolution", "Native"))
         body.addView(text("Разрешение игрового экрана", 12f, Color.WHITE)); body.addView(resolution)
         body.addView(text("Изображение: растянуть на весь экран, без чёрных полос", 11f, olive))
@@ -267,6 +267,20 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         body.addView(preview, LinearLayout.LayoutParams(-1, dp(220)).apply {
             topMargin = dp(8)
             bottomMargin = dp(8)
+        })
+        val sizeChoice = spinner(listOf("50%", "75%", "100%", "125%", "150%", "175%"), "100%")
+        body.addView(text("Размер выбранной кнопки", 12f, Color.WHITE))
+        body.addView(sizeChoice)
+        body.addView(button("ПРИМЕНИТЬ РАЗМЕР") {
+            val selected = preview.selectedIndex
+            if (selected >= 0 && selected < elements.length()) {
+                val item = elements.optJSONObject(selected)
+                val multiplier = (sizeChoice.selectedItem?.toString()?.removeSuffix("%")?.toFloatOrNull() ?: 100f) / 100f
+                item?.put("scale", (multiplier * 0.9f).coerceIn(0.35f, 1.8f))
+                actions.saveControlLayout(elements.toString())
+                preview.invalidate()
+                message("Размер кнопки обновлён")
+            } else message("Сначала выбери кнопку на поле")
         })
         body.addView(button("РАЗВЕРНУТЬ РЕДАКТОР НА ВЕСЬ ЭКРАН", true) {
             showFullscreenControlEditor(elements, preview)
