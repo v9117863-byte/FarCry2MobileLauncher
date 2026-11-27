@@ -107,13 +107,14 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         TextView(activity).apply {
             text = value.uppercase()
             gravity = Gravity.CENTER
-            textSize = 17f
+            textSize = 16f
+            letterSpacing = 0.035f
             typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
             setTextColor(if (selected) Color.rgb(22, 26, 23) else cream)
             setPadding(dp(12), dp(7), dp(12), dp(7))
             val face = GradientDrawable().apply {
-                setColor(if (selected) Color.rgb(221, 211, 180) else Color.argb(28, 232, 225, 195))
-                cornerRadius = dp(2).toFloat()
+                setColor(if (selected) Color.rgb(221, 211, 180) else Color.rgb(48, 60, 49))
+                cornerRadius = dp(3).toFloat()
                 setStroke(dp(1), if (selected) Color.rgb(250, 240, 211) else Color.argb(75, 230, 222, 188))
             }
             background = RippleDrawable(
@@ -128,10 +129,22 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         }
     private fun heading(title: String, subtitle: String) {
         body.removeAllViews()
-        body.addView(text("FAR CRY 2", 31f, Color.WHITE, true))
+        body.addView(text("UBISOFT  /  2008", 9f, gold, true).apply {
+            letterSpacing = 0.20f
+            setPadding(0, 0, 0, dp(2))
+        })
+        body.addView(text("FAR CRY 2", 34f, Color.WHITE, true).apply {
+            letterSpacing = 0.035f
+            setShadowLayer(4f, 1f, 2f, Color.argb(180, 0, 0, 0))
+        })
         body.addView(text(title.uppercase(), 12f, Color.rgb(48, 57, 41), true).apply {
-            letterSpacing = 0.16f
-            setPadding(0, dp(1), 0, dp(5))
+            letterSpacing = 0.18f
+            setPadding(0, dp(2), 0, dp(5))
+        })
+        body.addView(View(activity).apply {
+            setBackgroundColor(Color.argb(180, 174, 151, 96))
+        }, LinearLayout.LayoutParams(-1, dp(1)).apply {
+            topMargin = dp(2); bottomMargin = dp(7)
         })
         body.addView(text(subtitle.uppercase(), 9f, Color.rgb(57, 67, 48)).apply {
             setPadding(0, 0, 0, dp(15))
@@ -216,7 +229,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         val driver = spinner(listOf("Системный", "Turnip", "VirGL"),
             saved.optString("graphicsDriver", "Системный"))
         body.addView(text("Графический драйвер", 12f, Color.WHITE)); body.addView(driver)
-        val quality = spinner(listOf("Очень низкая", "Низкая", "Средняя", "Высокая", "Максимальная"),
+        val quality = spinner(listOf("Низкая", "Средняя", "Высокая"),
             saved.optString("performance", "Низкая"))
         body.addView(text("Профиль производительности", 12f, Color.WHITE)); body.addView(quality)
         body.addView(text("Низкие профили экономят память и уменьшают нагрузку на GPU", 10f, olive))
