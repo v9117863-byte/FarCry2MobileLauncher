@@ -768,14 +768,14 @@ class MainActivity : Activity() {
                         "AspectRatio" to "0",
                         "ResolutionX" to profileWidth.toString(),
                         "ResolutionY" to profileHeight.toString(),
-                        "VSync" to "1",
+                        "VSync" to "0",
                         "MultiSampleMode" to "0",
                         "AlphaToCoverage" to "0",
                         "Hdr" to "0",
                         "HdrFP32" to "0",
                         "Bloom" to "0",
                         "AllowAsynchShaderLoading" to "1",
-                        "MaxDriverBufferedFrames" to "1"
+                        "MaxDriverBufferedFrames" to "2"
                     )
                     for ((key, value) in forcedAttrs) {
                         val attr = Regex("\\b" + Regex.escape(key) + "=\"[^\"]*\"")
@@ -823,10 +823,10 @@ class MainActivity : Activity() {
                         "AmbientQuality" to "low", "ShadowQuality" to "off",
                         "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
                     "Высокая" -> linkedMapOf(
-                        "EnvironmentQuality" to "high", "AntiPortalQuality" to "high",
+                        "EnvironmentQuality" to "high", "AntiPortalQuality" to "low",
                         "PostFxQuality" to "medium", "TextureQuality" to "high",
                         "TextureResolutionQuality" to "high", "WaterQuality" to "medium",
-                        "DepthPassQuality" to "high", "VegetationQuality" to "medium",
+                        "DepthPassQuality" to "low", "VegetationQuality" to "medium",
                         "TerrainQuality" to "high", "GeometryQuality" to "high",
                         "AmbientQuality" to "medium", "ShadowQuality" to "low",
                         "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
@@ -931,8 +931,10 @@ class MainActivity : Activity() {
                 }
                 val dxvkTuning = linkedMapOf(
                     "d3d9.apitraceMode" to "False",
-                    "d3d9.maxFrameLatency" to "1",
-                    "d3d9.presentInterval" to "1",
+                    // Two queued frames avoid starving the mobile GPU while keeping latency bounded.
+                    "d3d9.maxFrameLatency" to "2",
+                    // Let DXVK's 30 FPS limiter pace frames; avoid a second blocking VSync wait.
+                    "d3d9.presentInterval" to "0",
                     "dxgi.maxFrameRate" to "30"
                 )
                 for ((key, value) in dxvkTuning) {
@@ -945,7 +947,7 @@ class MainActivity : Activity() {
                 dxvkConfigFile.writeText(dxvkConfigLines.joinToString("\n") + "\n", Charsets.UTF_8)
                 gameEnv.put("DXVK_CONFIG_FILE", dxvkConfigFile.absolutePath)
                 appendLaunchLog("DXVK_FC2_PROFILE config=" + dxvkConfigFile.absolutePath +
-                    " customVendorId=unset adapterIdentity=native apitraceMode=False vsync=1 frameCap=30 maxFrameLatency=1")
+                    " customVendorId=unset adapterIdentity=native apitraceMode=False vsync=0 frameCap=30 maxFrameLatency=2")
                 gameEnv.put("DXVK_LOG_LEVEL", "warn")
                 gameEnv.put("DXVK_LOG_PATH", dxvkLogDir.absolutePath)
                 gameEnv.put("WINEDEBUG", "-all")
