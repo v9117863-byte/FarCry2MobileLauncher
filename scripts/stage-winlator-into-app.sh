@@ -1601,3 +1601,23 @@ echo "C/C++: $(find "$APP/cpp" -type f | wc -l)"
 echo "JNI: $(find "$APP/jniLibs" -type f 2>/dev/null | wc -l)"
 echo "Resources: $(find "$APP/res" -type f | wc -l)"
 echo "Assets: $(find "$APP/assets" -type f | wc -l)"
+
+
+# Ensure PulseAudio never leaves the Android AAudio output muted.
+python3 - "$APP/java/com/winlator/xenvironment/components/PulseAudioComponent.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '''            "load-module module-aaudio-sink volume="+volume+" performance_mode="+performanceMode,
+            "set-default-sink AAudioSink"
+        ));'''
+new = '''            "load-module module-aaudio-sink volume="+volume+" performance_mode="+performanceMode,
+            "set-default-sink AAudioSink",
+            "set-sink-mute AAudioSink 0"
+        ));'''
+if "set-sink-mute AAudioSink 0" not in s:
+    if old not in s: raise SystemExit("Upstream PulseAudio AAudio sink block not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
