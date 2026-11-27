@@ -254,6 +254,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
                 message("Не удалось подтвердить сохранение настроек")
             }
         })
+        body.addView(button("Настройки управления") { showControlEditor() })
         body.addView(button("Игровые компоненты") { showRuntime() })
         body.addView(button("Назад") { if (currentPage == "settings") showHome() })
     }
@@ -374,6 +375,30 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         layout.addView(largePreview, LinearLayout.LayoutParams(-1, 0, 1f).apply {
             topMargin = dp(6); bottomMargin = dp(8)
         })
+        val sizePanel = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        sizePanel.addView(text("РАЗМЕР", 11f, cream, true).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(dp(76), dp(46)))
+        val fullscreenSize = spinner(listOf("50%", "75%", "100%", "125%", "150%", "175%", "200%"),
+            "100%")
+        sizePanel.addView(fullscreenSize, LinearLayout.LayoutParams(0, dp(46), 1f))
+        sizePanel.addView(button("ПРИМЕНИТЬ") {
+            val selected = largePreview.selectedIndex
+            if (selected in 0 until elements.length()) {
+                val item = elements.optJSONObject(selected)
+                val multiplier = (fullscreenSize.selectedItem?.toString()
+                    ?.removeSuffix("%")?.toFloatOrNull() ?: 100f) / 100f
+                item?.put("scale", (multiplier * 0.9f).coerceIn(0.35f, 2.0f))
+                actions.saveControlLayout(elements.toString())
+                largePreview.invalidate()
+                mainPreview.invalidate()
+                message("Размер кнопки сохранён")
+            } else message("Сначала коснись нужной кнопки на поле")
+        }.apply { layoutParams = LinearLayout.LayoutParams(dp(116), dp(46)) })
+        layout.addView(sizePanel)
         val controls = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -539,10 +564,31 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
     }
 
     private fun spinner(values: List<String>, selected: String): Spinner {
-        val s = Spinner(activity)
-        s.adapter = ArrayAdapter(activity, android.R.layout.simple_spinner_dropdown_item, values)
-        s.setSelection(values.indexOf(selected).coerceAtLeast(0))
-        return s
+        val adapter = object : ArrayAdapter<String>(activity, android.R.layout.simple_spinner_item, values) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                return (super.getView(position, convertView, parent) as TextView).apply {
+                    setTextColor(Color.WHITE)
+                    textSize = 14f
+                    setPadding(dp(12), dp(8), dp(12), dp(8))
+                    setBackgroundColor(Color.rgb(39, 51, 42))
+                }
+            }
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                return (super.getDropDownView(position, convertView, parent) as TextView).apply {
+                    setTextColor(Color.WHITE)
+                    textSize = 14f
+                    setPadding(dp(14), dp(11), dp(14), dp(11))
+                    setBackgroundColor(Color.rgb(39, 51, 42))
+                }
+            }
+        }
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        return Spinner(activity).apply {
+            adapter = adapter
+            setSelection(values.indexOf(selected).coerceAtLeast(0))
+            minimumHeight = dp(46)
+            backgroundTintList = ColorStateList.valueOf(gold)
+        }
     }
 
     private fun showRuntime() {
