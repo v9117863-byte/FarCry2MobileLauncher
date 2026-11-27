@@ -1634,3 +1634,93 @@ if "import android.graphics.LinearGradient;" not in s:
         "import android.graphics.Color;\nimport android.graphics.LinearGradient;\nimport android.graphics.Shader;\n", 1)
 p.write_text(s)
 PY
+
+# Fix the PulseAudio working directory. The leading slash in the upstream child path
+# made java.io.File resolve to /pulseaudio instead of files/pulseaudio, while the
+# modules are extracted into files/pulseaudio/modules. This prevented the AAudio
+# sink modules and default.pa from being found on Android.
+python3 - "$APP/java/com/winlator/xenvironment/components/PulseAudioComponent.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = 'File workingDir = new File(context.getFilesDir(), "/pulseaudio");'
+new = 'File workingDir = new File(context.getFilesDir(), "pulseaudio");'
+if new not in s:
+    if old not in s: raise SystemExit("PulseAudio working directory marker not found")
+    s = s.replace(old, new, 1)
+old = '''        if (!workingDir.isDirectory()) {
+            workingDir.mkdirs();
+            FileUtils.chmod(workingDir, 0771);
+        }'''
+new = '''        if (!workingDir.isDirectory() && !workingDir.mkdirs()) {
+            ProcessHelper.appendDiagnosticLine("PULSEAUDIO_ERROR cannot-create-working-dir=" + workingDir.getAbsolutePath());
+            return -1;
+        }
+        FileUtils.chmod(workingDir, 0771);'''
+if "PULSEAUDIO_ERROR cannot-create-working-dir=" not in s:
+    if old not in s: raise SystemExit("PulseAudio working directory creation block not found")
+    s = s.replace(old, new, 1)
+old = '''        File configFile = new File(workingDir, "default.pa");
+        FileUtils.writeString(configFile, String.join("\\n",'''
+new = '''        File configFile = new File(workingDir, "default.pa");
+        FileUtils.writeString(configFile, String.join("\\n",'''
+if old not in s: raise SystemExit("PulseAudio config file marker not found")
+# Keep upstream AAudio sink name and default selection; never pass an unsupported sink_name option.
+if 'sink_name=AAudioSink' in s:
+    s = s.replace(' module-aaudio-sink sink_name=AAudioSink ', ' module-aaudio-sink ', 1)
+old = '''        File modulesDir = new File(workingDir, "modules");
+        EnvVars envVars = new EnvVars();'''
+new = '''        File modulesDir = new File(workingDir, "modules");
+        ProcessHelper.appendDiagnosticLine("PULSEAUDIO_CONFIG cwd=" + workingDir.getAbsolutePath() +
+            " config=" + configFile.getAbsolutePath() + " configExists=" + configFile.isFile() +
+            " modules=" + modulesDir.getAbsolutePath() + " modulesExists=" + modulesDir.isDirectory() +
+            " socket=" + socketConfig.path);
+        EnvVars envVars = new EnvVars();'''
+if "PULSEAUDIO_CONFIG cwd=" not in s:
+    if old not in s: raise SystemExit("PulseAudio modules directory marker not found")
+    s = s.replace(old, new, 1)
+old = '''        command += " --exit-idle-time=-1";
+
+        return ProcessHelper.exec(command, envVars, workingDir);'''
+new = '''        command += " --exit-idle-time=-1";
+        File logFile = new File(workingDir, "pulseaudio.log");
+        command += " --log-level=info --log-target=file:" + logFile.getAbsolutePath();
+
+        int processId = ProcessHelper.exec(command, envVars, workingDir);
+        ProcessHelper.appendDiagnosticLine("PULSEAUDIO_PROCESS pid=" + processId +
+            " executable=" + nativeLibraryDir + "/libpulseaudio.so" +
+            " log=" + logFile.getAbsolutePath());
+        return processId;'''
+if "PULSEAUDIO_PROCESS pid=" not in s:
+    if old not in s: raise SystemExit("PulseAudio process command marker not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
+
+# Make movement/look zones invisible without disabling their hit targets or bindings.
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '''            if (fc2Profile != null) {
+                fc2Profile.setHideMouseCursor(false);
+                fc2Profile.save();
+                showInputControls(fc2Profile);'''
+new = '''            if (fc2Profile != null) {
+                fc2Profile.loadElements(inputControlsView);
+                for (com.winlator.inputcontrols.ControlElement element : fc2Profile.getElements()) {
+                    if (element.getType() == com.winlator.inputcontrols.ControlElement.Type.D_PAD ||
+                        element.getType() == com.winlator.inputcontrols.ControlElement.Type.TRACKPAD) {
+                        element.setOpacity(0.0f);
+                    }
+                }
+                fc2Profile.setHideMouseCursor(true);
+                fc2Profile.save();
+                showInputControls(fc2Profile);'''
+if "element.setOpacity(0.0f)" not in s:
+    if old not in s: raise SystemExit("FC2 touch profile activation block not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
