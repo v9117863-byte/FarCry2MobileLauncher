@@ -717,8 +717,8 @@ class MainActivity : Activity() {
                 container.setScreenSize(resolveRequestedScreenSize())
                 container.setAudioDriver(com.winlator.container.AudioDrivers.PULSEAUDIO)
                 // Keep a real AAudio sink, full volume and a stable low-latency PulseAudio buffer.
-                container.setAudioDriverConfig("performanceMode=1,volume=1.0,latencyMillis=64")
-                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio config=performanceMode:1,volume:1.0,latencyMillis:64; Wine registry and XEnvironment socket are forced")
+                container.setAudioDriverConfig("performanceMode=1,volume=1.0,latencyMillis=96")
+                appendLaunchLog("AUDIO_DRIVER selected=pulseaudio config=performanceMode:1,volume:1.0,latencyMillis:96; AAudio sink expected; verify pulseaudio.log for module-load and sink errors")
                 // Far Cry 2 reads its renderer from GamerProfile.xml; seed DX9 before its first run.
                 val fc2ProfileDir = File(container.getUserDir(), "Documents/My Games/Far Cry 2")
                 if (!fc2ProfileDir.isDirectory && !fc2ProfileDir.mkdirs()) {
@@ -963,6 +963,8 @@ class MainActivity : Activity() {
                 prefs.getString("launch_settings", null)?.let { JSONObject(it) }
             } catch (_: Exception) { null }
             return when (settings?.optString("resolution", "Native") ?: "Native") {
+                "144p" -> "256x144"
+                "240p" -> "426x240"
                 "320p" -> "568x320"
                 "360p" -> "640x360"
                 "400p" -> "711x400"
@@ -1150,7 +1152,7 @@ class MainActivity : Activity() {
 
         @JavascriptInterface fun saveLaunchSettings(json: String) {
             val parsed = JSONObject(json)
-            require(parsed.optString("resolution") in setOf("320p", "360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "1600p", "1800p", "2160p", "Native"))
+            require(parsed.optString("resolution") in setOf("144p", "240p", "320p", "360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "1600p", "1800p", "2160p", "Native"))
             require(parsed.optString("graphicsDriver") in setOf("Системный", "Turnip", "VirGL"))
             require(parsed.optString("performance") in setOf("Низкая", "Средняя", "Высокая"))
             check(prefs.edit().putString("launch_settings", parsed.toString()).commit()) {
