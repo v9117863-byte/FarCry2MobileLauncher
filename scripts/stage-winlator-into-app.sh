@@ -17,6 +17,146 @@ i686-w64-mingw32-gcc -shared -O2 -s -Wl,--kill-at \
 file "$APP/assets/fc2-compat/opengl32.dll"
 mkdir -p "$APP/java/com"
 cp -a "$UPSTREAM/app/src/main/java/com/winlator" "$APP/java/com/"
+
+# Far Cry 2 uses stretch-to-fill at every virtual resolution. Upstream letterboxes.
+python3 - "$APP/java/com/winlator/renderer/FullscreenTransformation.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = """        short targetHeight = (short)Math.min(screenInfo.height, ((float)screenInfo.width / originWidth) * originHeight);
+        short targetWidth = (short)(((float)targetHeight / originHeight) * originWidth);
+        this.x = (short)((screenInfo.width - targetWidth) * 0.5f);
+        this.y = (short)((screenInfo.height - targetHeight) * 0.5f);
+        this.width = targetWidth;
+        this.height = targetHeight;"""
+new = """        // Stretch the game surface to the complete XServer viewport (no black bars).
+        this.x = 0;
+        this.y = 0;
+        this.width = screenInfo.width;
+        this.height = screenInfo.height;"""
+if "Stretch the game surface to the complete XServer viewport" not in s:
+    if old not in s: raise SystemExit("FullscreenTransformation aspect-fit block not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
+python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = 'renderer.setForceWindowsFullscreen(shortcut != null && shortcut.getExtra("forceFullscreen", "0").equals("1"));'
+new = 'renderer.setForceWindowsFullscreen(true);'
+if new not in s:
+    if old not in s: raise SystemExit("Renderer fullscreen setting not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
+
+# Explicitly route the PulseAudio AAudio sink as the default and unmute it.
+python3 - "$APP/java/com/winlator/xenvironment/components/PulseAudioComponent.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+old = '''            "load-module module-aaudio-sink volume="+volume+" performance_mode="+performanceMode
+        ));'''
+new = '''            "load-module module-aaudio-sink sink_name=AAudioSink volume="+volume+" performance_mode="+performanceMode,
+            "set-default-sink AAudioSink",
+            "set-sink-mute AAudioSink 0"
+        ));'''
+if "set-default-sink AAudioSink" not in s:
+    if old not in s: raise SystemExit("PulseAudio AAudio sink config not found")
+    s = s.replace(old, new, 1)
+old_start = '            pid = execPulseAudio();'
+new_start = '''            pid = execPulseAudio();
+            ProcessHelper.appendDiagnosticLine("PULSEAUDIO_SERVER_START pid=" + pid +
+                " socket=" + socketConfig.path + " sink=AAudioSink volume=" + volume +
+                " performanceMode=" + performanceMode);'''
+if "PULSEAUDIO_SERVER_START pid=" not in s:
+    if old_start not in s: raise SystemExit("PulseAudio start marker not found")
+    s = s.replace(old_start, new_start, 1)
+p.write_text(s)
+PY
+
+# Add shaded tactical button surfaces and keep each action label visible.
+python3 - "$APP/java/com/winlator/inputcontrols/ControlElement.java" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+button_old = '''                if (propertyFlags.isSet(FLAG_PRESSED)) paint.setStyle(Paint.Style.FILL);
+
+                float cx = boundingBox.centerX();
+                float cy = boundingBox.centerY();
+
+                switch (shape) {'''
+button_new = '''                boolean pressed = propertyFlags.isSet(FLAG_PRESSED);
+                float cx = boundingBox.centerX();
+                float cy = boundingBox.centerY();
+
+                paint.setStyle(Paint.Style.FILL);
+                paint.setShader(new LinearGradient(boundingBox.left, boundingBox.top,
+                    boundingBox.right, boundingBox.bottom,
+                    new int[] { pressed ? getDarkColor() : getHighlightColor(),
+                        pressed ? getDarkColor() : lightColor, getDarkColor() },
+                    null, Shader.TileMode.CLAMP));
+                switch (shape) {'''
+if "new int[] { pressed ? getDarkColor()" not in s:
+    if button_old not in s: raise SystemExit("ControlElement button background block not found")
+    s = s.replace(button_old, button_new, 1)
+    marker = '''                }
+
+                if (iconId > 0) {'''
+    replacement = '''                }
+                paint.setShader(null);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(strokeWidth);
+                paint.setColor(pressed ? getHighlightColor() : lightColor);
+                switch (shape) {
+                    case CIRCLE:
+                        canvas.drawCircle(cx, cy, boundingBox.width() * 0.5f, paint);
+                        break;
+                    case RECT:
+                        canvas.drawRect(boundingBox, paint);
+                        break;
+                    case ROUND_RECT: {
+                        float radius = boundingBox.height() * 0.5f;
+                        canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
+                        break;
+                    }
+                    case SQUARE: {
+                        float radius = snappingSize * 0.75f * scale;
+                        canvas.drawRoundRect(boundingBox.left, boundingBox.top, boundingBox.right, boundingBox.bottom, radius, radius, paint);
+                        break;
+                    }
+                }
+
+                if (iconId > 0) {'''
+    if marker not in s: raise SystemExit("ControlElement outline insertion marker not found")
+    s = s.replace(marker, replacement, 1)
+old = '''                if (iconId > 0) {
+                    drawIcon(canvas, cx, cy, boundingBox.width(), boundingBox.height(), iconId, true);
+                }
+                else {'''
+new = '''                if (iconId > 0) {
+                    drawIcon(canvas, cx, cy - boundingBox.height() * 0.13f,
+                        boundingBox.width() * 0.62f, boundingBox.height() * 0.62f, iconId, false);
+                    String text = getDisplayText();
+                    paint.setTextSize(Math.min(getTextSizeForWidth(paint, text,
+                        boundingBox.width() - strokeWidth * 2), snappingSize * 1.15f * scale));
+                    paint.setTextAlign(Paint.Align.CENTER);
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(pressed ? getDarkColor() : lightColor);
+                    canvas.drawText(text, cx, cy + boundingBox.height() * 0.34f -
+                        ((paint.descent() + paint.ascent()) * 0.5f), paint);
+                }
+                else {'''
+if "boundingBox.height() * 0.34f" not in s:
+    if old not in s: raise SystemExit("ControlElement icon render block not found")
+    s = s.replace(old, new, 1)
+p.write_text(s)
+PY
 # Always synchronize Wine's registry with the selected audio backend. The upstream
 # implementation trusts a cached container extra and can leave user.reg on ALSA.
 python3 - "$APP/java/com/winlator/XServerDisplayActivity.java" <<'PY'
