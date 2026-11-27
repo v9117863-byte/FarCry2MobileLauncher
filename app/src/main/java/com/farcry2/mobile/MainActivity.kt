@@ -805,6 +805,14 @@ class MainActivity : Activity() {
                     normalizedProfile = normalizedProfile.replaceRange(mipRenderTag.range, attrs)
                 }
                 val qualityValues = when (selectedPerformance) {
+                    "Минимальная" -> linkedMapOf(
+                        "EnvironmentQuality" to "low", "AntiPortalQuality" to "low",
+                        "PostFxQuality" to "low", "TextureQuality" to "low",
+                        "TextureResolutionQuality" to "low", "WaterQuality" to "low",
+                        "DepthPassQuality" to "low", "VegetationQuality" to "low",
+                        "TerrainQuality" to "low", "GeometryQuality" to "low",
+                        "AmbientQuality" to "low", "ShadowQuality" to "off",
+                        "Hdr" to "0", "HdrFP32" to "0", "Bloom" to "0")
                     "Высокая" -> linkedMapOf(
                         "EnvironmentQuality" to "high", "AntiPortalQuality" to "high",
                         "PostFxQuality" to "medium", "TextureQuality" to "high",
@@ -1154,7 +1162,7 @@ class MainActivity : Activity() {
             val parsed = JSONObject(json)
             require(parsed.optString("resolution") in setOf("144p", "240p", "320p", "360p", "400p", "432p", "480p", "540p", "600p", "640p", "720p", "800p", "900p", "960p", "1080p", "1200p", "1440p", "1600p", "1800p", "2160p", "Native"))
             require(parsed.optString("graphicsDriver") in setOf("Системный", "Turnip", "VirGL"))
-            require(parsed.optString("performance") in setOf("Низкая", "Средняя", "Высокая"))
+            require(parsed.optString("performance") in setOf("Минимальная", "Низкая", "Средняя", "Высокая"))
             check(prefs.edit().putString("launch_settings", parsed.toString()).commit()) {
                 "Не удалось записать настройки"
             }
