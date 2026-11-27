@@ -29,6 +29,7 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         fun gameStatus(): String
         fun runtimeStatus(): String
         fun saveSettings(json: String)
+        fun loadSettings(): String
         fun loadControlLayout(): String
         fun saveControlLayout(json: String)
         fun copyError()
@@ -206,15 +207,21 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
         currentPage = "settings"
         heading("OPTIONS", "GAME AND SYSTEM SETTINGS")
         section("Экран")
-        val resolution = spinner(listOf("480p", "540p", "600p", "720p", "Native"), "Native")
+        val saved = try { JSONObject(actions.loadSettings()) } catch (_: Exception) { JSONObject() }
+        val resolution = spinner(listOf("480p", "540p", "600p", "720p", "900p", "1080p", "Native"),
+            saved.optString("resolution", "Native"))
         body.addView(text("Разрешение игрового экрана", 12f, Color.WHITE)); body.addView(resolution)
+        body.addView(text("Изображение: растянуть на весь экран, без чёрных полос", 11f, olive))
         section("Графика")
-        val driver = spinner(listOf("Системный", "Turnip", "VirGL"), "Системный")
+        val driver = spinner(listOf("Системный", "Turnip", "VirGL"),
+            saved.optString("graphicsDriver", "Системный"))
         body.addView(text("Графический драйвер", 12f, Color.WHITE)); body.addView(driver)
-        val quality = spinner(listOf("Низкая", "Средняя", "Высокая"), "Низкая")
+        val quality = spinner(listOf("Низкая", "Средняя", "Высокая"),
+            saved.optString("performance", "Низкая"))
         body.addView(text("Профиль производительности", 12f, Color.WHITE)); body.addView(quality)
         val touch = CheckBox(activity).apply {
-            text = "Сенсорное управление"; setTextColor(Color.WHITE); isChecked = true
+            text = "Сенсорное управление"; setTextColor(Color.WHITE)
+            isChecked = saved.optBoolean("touchControls", true)
         }
         body.addView(touch)
         body.addView(button("Редактор управления") { showControlEditor() })
@@ -224,7 +231,15 @@ class NativeLauncherUi(private val activity: Activity, private val actions: Acti
                 .put("performance", quality.selectedItem?.toString() ?: "Низкая")
                 .put("touchControls", touch.isChecked)
             actions.saveSettings(json.toString())
-            message("Настройки сохранены")
+            val check = try { JSONObject(actions.loadSettings()) } catch (_: Exception) { JSONObject() }
+            if (check.optString("resolution") == resolution.selectedItem?.toString() &&
+                check.optString("graphicsDriver") == driver.selectedItem?.toString() &&
+                check.optString("performance") == quality.selectedItem?.toString() &&
+                check.optBoolean("touchControls", !touch.isChecked) == touch.isChecked) {
+                message("Настройки сохранены")
+            } else {
+                message("Не удалось подтвердить сохранение настроек")
+            }
         })
         body.addView(button("Игровые компоненты") { showRuntime() })
         body.addView(button("Назад") { if (currentPage == "settings") showHome() })
