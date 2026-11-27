@@ -1948,7 +1948,7 @@ import sys
 p = Path(sys.argv[1])
 s = p.read_text()
 marker = '            envVars.put("PULSE_SERVER", rootPath+UnixSocketConfig.PULSE_SERVER_PATH);'
-replacement = marker + '\\n            envVars.put("PULSE_SINK", "AAudioSink");'
+replacement = marker + '\n            envVars.put("PULSE_SINK", "AAudioSink");'
 if 'envVars.put("PULSE_SINK", "AAudioSink");' not in s:
     if marker not in s:
         raise SystemExit("Wine PULSE_SERVER environment insertion point not found")
